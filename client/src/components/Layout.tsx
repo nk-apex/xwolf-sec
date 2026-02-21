@@ -4,6 +4,7 @@ import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import logoPath from "@assets/xwolf_logo.png";
+import { MatrixBackground } from "./MatrixBackground";
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
@@ -18,6 +19,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col md:flex-row font-sans relative overflow-hidden">
+      <MatrixBackground />
       <div className="neon-grid-bg" />
 
       <header className="md:hidden flex items-center justify-between p-4 border-b border-primary/20 sticky top-0 z-50 bg-black/90 backdrop-blur-sm">
