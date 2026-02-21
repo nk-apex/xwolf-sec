@@ -35,7 +35,8 @@ export function ScannerInput() {
             value={url}
             onChange={(e) => setUrl(e.target.value)}
             placeholder="Enter target URL (e.g. https://example.com)"
-            className="h-14 pl-10 pr-32 bg-background/80 border-border/50 rounded-lg font-mono text-sm text-primary focus-visible:ring-1 focus-visible:ring-primary/50 placeholder:text-muted-foreground/50"
+            className="h-14 pl-10 pr-32 rounded-lg font-mono text-sm text-primary focus-visible:ring-1 focus-visible:ring-primary/50 placeholder:text-muted-foreground/50"
+            style={{ backgroundColor: 'var(--surface-color)', borderColor: 'var(--border-color)', backdropFilter: 'blur(var(--backdrop-blur))' }}
           />
           <div className="absolute right-2 top-2 bottom-2">
             <Button

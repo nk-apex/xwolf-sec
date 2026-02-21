@@ -17,7 +17,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col md:flex-row font-sans">
-      <header className="md:hidden flex items-center justify-between p-4 border-b border-border bg-card/80 backdrop-blur-md sticky top-0 z-50">
+      <header className="md:hidden flex items-center justify-between p-4 border-b border-border sticky top-0 z-50" style={{ backgroundColor: 'var(--surface-color)', backdropFilter: 'blur(var(--backdrop-blur))' }}>
         <div className="flex items-center gap-2">
           <img src={faviconPath} alt="XWOLF SEC" className="w-7 h-7 rounded" />
           <span className="font-bold tracking-tight neon-text text-sm" data-testid="text-brand-mobile">XWOLF SEC</span>
@@ -29,13 +29,18 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-40 w-60 bg-card/50 border-r border-border/50 transform transition-transform duration-300 md:translate-x-0 md:static md:block backdrop-blur-sm",
+          "fixed inset-y-0 left-0 z-40 w-60 border-r transform transition-transform duration-300 md:translate-x-0 md:static md:block",
           mobileMenuOpen ? "translate-x-0" : "-translate-x-full"
         )}
+        style={{
+          backgroundColor: 'var(--surface-color)',
+          backdropFilter: 'blur(var(--backdrop-blur))',
+          borderColor: 'var(--border-color)',
+        }}
       >
         <div className="h-full flex flex-col">
-          <div className="p-5 flex items-center gap-3 border-b border-border/30">
-            <img src={faviconPath} alt="XWOLF SEC" className="w-9 h-9 rounded-lg border border-primary/20" />
+          <div className="p-5 flex items-center gap-3" style={{ borderBottom: '1px solid var(--border-color)' }}>
+            <img src={faviconPath} alt="XWOLF SEC" className="w-9 h-9 rounded-lg" style={{ border: '1px solid rgba(var(--primary-color-rgb), 0.2)' }} />
             <div>
               <h1 className="font-bold text-base tracking-wider neon-text" data-testid="text-brand">XWOLF SEC</h1>
               <p className="text-[9px] text-muted-foreground font-mono tracking-wider leading-tight">Security Analysis<br />& Threat Intelligence</p>
@@ -53,23 +58,24 @@ export function Layout({ children }: { children: React.ReactNode }) {
                   className={cn(
                     "flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all duration-200 relative",
                     isActive
-                      ? "bg-primary/10 text-primary neon-border"
-                      : "text-muted-foreground hover:bg-primary/5 hover:text-primary/70"
+                      ? "text-primary neon-border"
+                      : "text-muted-foreground"
                   )}
+                  style={isActive ? { backgroundColor: 'rgba(var(--primary-color-rgb), 0.1)' } : undefined}
                 >
                   {isActive && (
-                    <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-primary rounded-r-full shadow-[0_0_8px_rgba(0,255,0,0.5)]" />
+                    <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 rounded-r-full" style={{ backgroundColor: 'var(--primary-color)', boxShadow: '0 0 8px rgba(var(--primary-color-rgb), 0.5)' }} />
                   )}
                   <item.icon className={cn("w-4 h-4", isActive && "drop-shadow-[0_0_4px_rgba(0,255,0,0.5)]")} />
                   {item.label}
-                  {isActive && <span className="ml-auto w-1.5 h-1.5 rounded-full bg-primary shadow-[0_0_6px_rgba(0,255,0,0.8)]" />}
+                  {isActive && <span className="ml-auto w-1.5 h-1.5 rounded-full" style={{ backgroundColor: 'var(--primary-color)', boxShadow: '0 0 6px rgba(var(--primary-color-rgb), 0.8)' }} />}
                 </Link>
               );
             })}
           </nav>
 
-          <div className="p-3 border-t border-border/30">
-            <div className="rounded-lg p-3 text-[10px] font-mono text-muted-foreground border border-border/30 bg-background/50">
+          <div className="p-3" style={{ borderTop: '1px solid var(--border-color)' }}>
+            <div className="rounded-lg p-3 text-[10px] font-mono text-muted-foreground" style={{ border: '1px solid var(--border-color)', backgroundColor: 'rgba(var(--surface-color-rgb), 0.5)' }}>
               <div className="flex items-center justify-between mb-2">
                 <span className="flex items-center gap-1.5">
                   <Zap className="w-3 h-3 text-primary" />
@@ -77,8 +83,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 </span>
                 <span className="text-primary font-bold tracking-wider" data-testid="text-status">ONLINE</span>
               </div>
-              <div className="w-full bg-background rounded-full h-0.5 mt-1">
-                <div className="bg-primary w-full h-0.5 rounded-full animate-pulse shadow-[0_0_4px_rgba(0,255,0,0.5)]" />
+              <div className="w-full rounded-full h-0.5 mt-1" style={{ backgroundColor: 'var(--background-color)' }}>
+                <div className="w-full h-0.5 rounded-full animate-pulse" style={{ backgroundColor: 'var(--primary-color)', boxShadow: '0 0 4px rgba(var(--primary-color-rgb), 0.5)' }} />
               </div>
             </div>
           </div>
@@ -89,7 +95,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <div
           className="absolute inset-0 z-0 opacity-[0.02]"
           style={{
-            backgroundImage: "radial-gradient(hsl(120, 100%, 50%) 1px, transparent 1px)",
+            backgroundImage: `radial-gradient(var(--primary-color) 1px, transparent 1px)`,
             backgroundSize: "30px 30px",
           }}
         />
@@ -98,7 +104,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
       {mobileMenuOpen && (
         <div
-          className="fixed inset-0 bg-black/70 backdrop-blur-sm z-30 md:hidden"
+          className="fixed inset-0 z-30 md:hidden"
+          style={{ backgroundColor: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)' }}
           onClick={() => setMobileMenuOpen(false)}
         />
       )}

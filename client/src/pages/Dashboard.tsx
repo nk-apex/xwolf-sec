@@ -38,10 +38,10 @@ export default function Dashboard() {
 
       <section className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4 mb-4 sm:mb-8" data-testid="section-stats">
         {[
-          { icon: Activity, label: "Total Scans", value: totalScans.toString(), color: "primary" },
-          { icon: ShieldCheck, label: "Secure Targets", value: secureCount.toString(), color: "primary" },
-          { icon: AlertTriangle, label: "Vulnerabilities", value: vulnerableCount.toString(), color: vulnerableCount > 0 ? "destructive" : "primary" },
-          { icon: Server, label: "Active Monitors", value: "24/7", color: "primary" },
+          { icon: Activity, label: "Total Scans", value: totalScans.toString(), isAlert: false },
+          { icon: ShieldCheck, label: "Secure Targets", value: secureCount.toString(), isAlert: false },
+          { icon: AlertTriangle, label: "Vulnerabilities", value: vulnerableCount.toString(), isAlert: vulnerableCount > 0 },
+          { icon: Server, label: "Active Monitors", value: "24/7", isAlert: false },
         ].map((stat, index) => (
           <motion.div
             key={stat.label}
@@ -49,27 +49,30 @@ export default function Dashboard() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: index * 0.1 }}
           >
-            <div className={cn(
-              "p-3 sm:p-5 rounded-xl border bg-black/30 backdrop-blur-sm h-full",
-              stat.color === "destructive" ? "border-destructive/20" : "border-primary/20"
-            )}>
+            <div
+              className="surface-card p-3 sm:p-5 h-full"
+              style={stat.isAlert ? { borderColor: 'rgba(239, 68, 68, 0.2)' } : undefined}
+            >
               <div className="flex justify-between items-start gap-1">
                 <div className="min-w-0 flex-1">
                   <p className="text-gray-400 text-[9px] sm:text-xs uppercase tracking-wider mb-0.5 sm:mb-1 truncate">{stat.label}</p>
-                  <h3 className={cn(
-                    "text-sm sm:text-2xl font-bold font-mono truncate",
-                    stat.color === "destructive" ? "text-destructive" : "neon-text"
-                  )} data-testid={`text-stat-value-${stat.label.toLowerCase().replace(/\s+/g, '-')}`}>
+                  <h3
+                    className={cn(
+                      "text-sm sm:text-2xl font-bold font-mono truncate",
+                      stat.isAlert ? "text-destructive" : "neon-text"
+                    )}
+                    data-testid={`text-stat-value-${stat.label.toLowerCase().replace(/\s+/g, '-')}`}
+                  >
                     {stat.value}
                   </h3>
                 </div>
-                <div className={cn(
-                  "p-1 sm:p-2 rounded-lg shrink-0",
-                  stat.color === "destructive" ? "bg-destructive/10" : "bg-primary/10"
-                )}>
+                <div
+                  className="p-1 sm:p-2 rounded-lg shrink-0"
+                  style={{ backgroundColor: stat.isAlert ? 'rgba(239, 68, 68, 0.1)' : 'rgba(var(--primary-color-rgb), 0.1)' }}
+                >
                   <stat.icon className={cn(
                     "w-3.5 h-3.5 sm:w-5 sm:h-5",
-                    stat.color === "destructive" ? "text-destructive" : "text-primary"
+                    stat.isAlert ? "text-destructive" : "text-primary"
                   )} />
                 </div>
               </div>
@@ -89,7 +92,7 @@ export default function Dashboard() {
             {[1, 2, 3].map((i) => (
               <div
                 key={i}
-                className="h-48 rounded-xl border border-border/30 bg-card p-6 space-y-4"
+                className="surface-card p-6 space-y-4 h-48"
               >
                 <Skeleton className="h-6 w-3/4" />
                 <Skeleton className="h-4 w-1/2" />
@@ -100,7 +103,8 @@ export default function Dashboard() {
         ) : scans?.length === 0 ? (
           <div
             data-testid="text-empty-scans"
-            className="text-center py-16 border border-dashed border-border/30 rounded-xl bg-card/30"
+            className="text-center py-16 rounded-xl"
+            style={{ border: '1px dashed var(--border-color)', backgroundColor: 'rgba(var(--surface-color-rgb), 0.3)' }}
           >
             <ShieldCheck className="w-12 h-12 mx-auto text-primary/30 mb-4" />
             <h3 className="text-lg font-medium text-primary/60">No scans yet</h3>
