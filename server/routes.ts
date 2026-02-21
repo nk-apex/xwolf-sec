@@ -447,6 +447,309 @@ async function analyzeUrl(targetUrl: string) {
     }
 
     // ──────────────────────────────────────
+    // 14. AUTHENTICATION & REGISTRATION DETECTION
+    // ──────────────────────────────────────
+    if (responseBody) {
+      const bodyLower = responseBody.toLowerCase();
+
+      const hasLoginForm = /<form[^>]*>[\s\S]*?(?:type=["']password["']|name=["'](?:password|passwd|pass|pwd)["'])[\s\S]*?<\/form>/i.test(responseBody);
+      const hasLoginLinks = /(?:\/login|\/signin|\/sign-in|\/auth\/login|\/account\/login|\/user\/login)/i.test(responseBody);
+      const hasLoginKeywords = /(?:log\s*in|sign\s*in|authenticate)/i.test(responseBody);
+
+      const hasRegisterForm = /<form[^>]*>[\s\S]*?(?:name=["'](?:confirm.?password|password.?confirm|register|signup)["']|(?:type=["']password["'][\s\S]*?type=["']password["']))[\s\S]*?<\/form>/i.test(responseBody);
+      const hasRegisterLinks = /(?:\/register|\/signup|\/sign-up|\/create.?account|\/join|\/auth\/register)/i.test(responseBody);
+      const hasRegisterKeywords = /(?:sign\s*up|register|create\s*(?:an?\s*)?account|join\s*(?:now|free|us))/i.test(responseBody);
+
+      const authDetected = hasLoginForm || hasLoginLinks || hasLoginKeywords;
+      const registrationDetected = hasRegisterForm || hasRegisterLinks || hasRegisterKeywords;
+
+      if (authDetected || registrationDetected) {
+        const detectedParts: string[] = [];
+        if (hasLoginForm) detectedParts.push("login form with password field");
+        if (hasLoginLinks) detectedParts.push("login page links");
+        if (hasRegisterForm) detectedParts.push("registration form");
+        if (hasRegisterLinks) detectedParts.push("registration page links");
+
+        findings.push(finding("INFO", "Authentication", `Authentication system detected: ${detectedParts.join(", ")}`,
+          `The site has an authentication system with: ${detectedParts.join(", ")}. This surface area was further analyzed for security weaknesses.`));
+      }
+
+      if (hasLoginForm || hasLoginLinks) {
+        const commonLoginPaths = ["/login", "/signin", "/sign-in", "/auth/login", "/admin/login", "/wp-login.php", "/user/login", "/account/login", "/admin"];
+        const accessibleLoginPaths: string[] = [];
+
+        for (const path of commonLoginPaths) {
+          try {
+            const loginRes = await fetch(`${urlObj.origin}${path}`, {
+              method: "GET",
+              headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" },
+              signal: AbortSignal.timeout(3000),
+              redirect: "follow",
+            });
+            if (loginRes.ok) {
+              const loginBody = await loginRes.text();
+              if (/type=["']password["']/i.test(loginBody)) {
+                accessibleLoginPaths.push(path);
+              }
+            }
+          } catch {}
+        }
+
+        if (accessibleLoginPaths.length > 0) {
+          findings.push(finding("INFO", "Authentication", `Login endpoints found: ${accessibleLoginPaths.join(", ")}`,
+            `Discovered ${accessibleLoginPaths.length} accessible login page(s) at: ${accessibleLoginPaths.join(", ")}. These endpoints accept user credentials and are targets for brute-force and credential stuffing attacks.`));
+
+          if (accessibleLoginPaths.some(p => p.includes("admin") || p.includes("wp-login"))) {
+            findings.push(finding("MEDIUM", "Authentication", "Admin login panel is publicly accessible",
+              `An administrative login page was found at a predictable URL (${accessibleLoginPaths.filter(p => p.includes("admin") || p.includes("wp-login")).join(", ")}). Public admin panels are prime targets for brute-force attacks. Consider restricting access by IP, adding 2FA, or hiding the admin URL.`));
+          }
+        }
+
+        for (const loginPath of accessibleLoginPaths.slice(0, 2)) {
+          try {
+            const loginPageRes = await fetch(`${urlObj.origin}${loginPath}`, {
+              method: "GET",
+              headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" },
+              signal: AbortSignal.timeout(3000),
+            });
+            if (loginPageRes.ok) {
+              const loginHtml = await loginPageRes.text();
+              const loginLower = loginHtml.toLowerCase();
+
+              const hasCaptcha = /captcha|recaptcha|hcaptcha|turnstile|g-recaptcha|cf-turnstile/i.test(loginHtml);
+              const hasCsrf = /csrf|_token|authenticity.token|__RequestVerificationToken/i.test(loginHtml);
+              const hasRateMsg = /too many|rate.limit|try again later|locked out|account.locked/i.test(loginHtml);
+
+              if (!hasCaptcha) {
+                findings.push(finding("HIGH", "Authentication", `No CAPTCHA on login page (${loginPath})`,
+                  `The login form at ${loginPath} does not use any CAPTCHA (reCAPTCHA, hCaptcha, Turnstile). Without CAPTCHA, automated tools can perform unlimited brute-force login attempts and credential stuffing attacks. Add a CAPTCHA challenge after failed attempts.`));
+              }
+
+              if (!hasCsrf) {
+                findings.push(finding("HIGH", "Authentication", `No CSRF protection on login form (${loginPath})`,
+                  `The login form at ${loginPath} does not appear to include a CSRF token. Without CSRF protection, an attacker can craft a malicious page that submits login requests on behalf of victims, potentially forcing them into attacker-controlled sessions (login CSRF).`));
+              }
+
+              if (loginLower.includes("autocomplete") && !loginHtml.includes('autocomplete="off"')) {
+                findings.push(finding("LOW", "Authentication", "Password field may allow browser autocomplete",
+                  `The login form does not disable autocomplete for sensitive fields. Browsers may cache credentials, which is risky on shared or public computers.`));
+              }
+            }
+          } catch {}
+        }
+
+        try {
+          const sqlPayloads = ["' OR '1'='1", "admin' --", "' OR 1=1 --"];
+          for (const payload of sqlPayloads) {
+            const loginPath = accessibleLoginPaths[0] || "/login";
+            try {
+              const sqliRes = await fetch(`${urlObj.origin}${loginPath}`, {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/x-www-form-urlencoded",
+                  "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                },
+                body: `username=${encodeURIComponent(payload)}&password=${encodeURIComponent(payload)}`,
+                signal: AbortSignal.timeout(5000),
+                redirect: "follow",
+              });
+              const sqliBody = await sqliRes.text();
+              const sqliLower = sqliBody.toLowerCase();
+
+              if (sqliLower.includes("sql syntax") || sqliLower.includes("sqlstate") ||
+                  sqliLower.includes("mysql") || sqliLower.includes("postgresql") ||
+                  sqliLower.includes("sqlite") || sqliLower.includes("ora-") ||
+                  sqliLower.includes("unclosed quotation")) {
+                findings.push(finding("CRITICAL", "Authentication", "SQL Injection vulnerability detected on login form",
+                  `The login form at ${loginPath} returns database error messages when given SQL injection payloads. The payload '${payload}' triggered a database error, indicating the input is not properly sanitized. This is a critical vulnerability that can allow attackers to bypass authentication, extract database contents, or gain full system access.`));
+                break;
+              }
+
+              if (sqliRes.status === 200 && (sqliLower.includes("dashboard") || sqliLower.includes("welcome") || sqliLower.includes("logged in") || sqliLower.includes("my account"))) {
+                findings.push(finding("CRITICAL", "Authentication", "Possible SQL Injection authentication bypass",
+                  `The login form at ${loginPath} may be vulnerable to SQL injection-based authentication bypass. The payload '${payload}' resulted in what appears to be a successful login response. This could allow attackers to log in as any user without knowing the password.`));
+                break;
+              }
+            } catch {}
+          }
+        } catch {}
+
+        const enumPayloads = [
+          { user: "admin@nonexistent-domain-xwolf-test.com", pass: "wrongpass123" },
+          { user: "test_user_xwolf_probe_" + Date.now(), pass: "wrongpass123" },
+        ];
+
+        const loginPath = accessibleLoginPaths[0] || "/login";
+        const enumResponses: string[] = [];
+        for (const cred of enumPayloads) {
+          try {
+            const enumRes = await fetch(`${urlObj.origin}${loginPath}`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/x-www-form-urlencoded",
+                "User-Agent": "Mozilla/5.0",
+              },
+              body: `username=${encodeURIComponent(cred.user)}&password=${encodeURIComponent(cred.pass)}&email=${encodeURIComponent(cred.user)}`,
+              signal: AbortSignal.timeout(5000),
+              redirect: "manual",
+            });
+            const enumBody = await enumRes.text();
+            enumResponses.push(enumBody.toLowerCase());
+          } catch {}
+        }
+
+        if (enumResponses.length >= 2) {
+          const hasUserNotFound = enumResponses.some(r => /user.*(not|doesn.t|does not)\s*(exist|found)|no\s*account|unknown\s*user|invalid\s*username/i.test(r));
+          const hasInvalidPassword = enumResponses.some(r => /incorrect\s*password|wrong\s*password|invalid\s*password|password.*incorrect/i.test(r));
+
+          if (hasUserNotFound || hasInvalidPassword) {
+            findings.push(finding("MEDIUM", "Authentication", "Username enumeration possible via login error messages",
+              `The login form reveals whether a username/email exists by returning different error messages for invalid usernames vs. invalid passwords. This allows attackers to build a list of valid accounts before attempting password attacks. Use a generic error message like "Invalid credentials" for all failed login attempts.`));
+          }
+        }
+      }
+
+      if (registrationDetected) {
+        const registerPaths = ["/register", "/signup", "/sign-up", "/create-account", "/join", "/auth/register"];
+        const accessibleRegPaths: string[] = [];
+
+        for (const path of registerPaths) {
+          try {
+            const regRes = await fetch(`${urlObj.origin}${path}`, {
+              method: "GET",
+              headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" },
+              signal: AbortSignal.timeout(3000),
+              redirect: "follow",
+            });
+            if (regRes.ok) {
+              const regBody = await regRes.text();
+              if (/type=["']password["']/i.test(regBody) || /(?:sign\s*up|register|create\s*account)/i.test(regBody)) {
+                accessibleRegPaths.push(path);
+              }
+            }
+          } catch {}
+        }
+
+        if (accessibleRegPaths.length > 0) {
+          findings.push(finding("INFO", "Registration", `Open registration endpoints: ${accessibleRegPaths.join(", ")}`,
+            `Found ${accessibleRegPaths.length} accessible registration page(s) at: ${accessibleRegPaths.join(", ")}. Open registration allows anyone to create accounts.`));
+
+          for (const regPath of accessibleRegPaths.slice(0, 1)) {
+            try {
+              const regPageRes = await fetch(`${urlObj.origin}${regPath}`, {
+                method: "GET",
+                headers: { "User-Agent": "Mozilla/5.0" },
+                signal: AbortSignal.timeout(3000),
+              });
+              if (regPageRes.ok) {
+                const regHtml = await regPageRes.text();
+
+                const hasCaptcha = /captcha|recaptcha|hcaptcha|turnstile|g-recaptcha|cf-turnstile/i.test(regHtml);
+                const hasCsrf = /csrf|_token|authenticity.token/i.test(regHtml);
+                const hasEmailVerification = /verify.*email|email.*verif|confirmation.*email|confirm.*account/i.test(regHtml);
+                const hasPasswordStrength = /password.*strength|password.*policy|(?:must|should).*(?:contain|include).*(?:upper|lower|number|special|character)/i.test(regHtml);
+
+                if (!hasCaptcha) {
+                  findings.push(finding("HIGH", "Registration", `No CAPTCHA on registration page (${regPath})`,
+                    `The registration form at ${regPath} has no CAPTCHA protection. Bots can automatically create unlimited fake accounts for spam, abuse, or launching attacks from within the platform. Implement reCAPTCHA, hCaptcha, or Cloudflare Turnstile.`));
+                }
+
+                if (!hasCsrf) {
+                  findings.push(finding("MEDIUM", "Registration", `No CSRF token on registration form (${regPath})`,
+                    `The registration form does not appear to include CSRF protection. An attacker could trick a victim into registering an account with attacker-controlled credentials.`));
+                }
+
+                if (!hasEmailVerification) {
+                  findings.push(finding("MEDIUM", "Registration", "No email verification indicated on registration page",
+                    `The registration page does not mention email verification. Without email verification, attackers can register accounts with fake or victim email addresses, enabling impersonation, spam, and platform abuse.`));
+                }
+
+                if (!hasPasswordStrength) {
+                  findings.push(finding("LOW", "Registration", "No visible password policy on registration page",
+                    `The registration form does not display a password strength policy. Users may create weak passwords vulnerable to brute-force attacks. Enforce and display minimum password requirements (length, complexity).`));
+                }
+              }
+            } catch {}
+          }
+        }
+      }
+
+      const defaultCredPaths = ["/admin", "/admin/login", "/wp-login.php", "/administrator"];
+      const defaultCreds = [
+        { user: "admin", pass: "admin" },
+        { user: "admin", pass: "password" },
+        { user: "admin", pass: "123456" },
+        { user: "root", pass: "root" },
+        { user: "test", pass: "test" },
+      ];
+
+      for (const credPath of defaultCredPaths) {
+        try {
+          const credPageRes = await fetch(`${urlObj.origin}${credPath}`, {
+            method: "GET",
+            headers: { "User-Agent": "Mozilla/5.0" },
+            signal: AbortSignal.timeout(3000),
+            redirect: "follow",
+          });
+
+          if (!credPageRes.ok) continue;
+          const credBody = await credPageRes.text();
+          if (!/type=["']password["']/i.test(credBody)) continue;
+
+          for (const cred of defaultCreds) {
+            try {
+              const loginAttempt = await fetch(`${urlObj.origin}${credPath}`, {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/x-www-form-urlencoded",
+                  "User-Agent": "Mozilla/5.0",
+                },
+                body: `username=${encodeURIComponent(cred.user)}&password=${encodeURIComponent(cred.pass)}&email=${encodeURIComponent(cred.user)}&log=${encodeURIComponent(cred.user)}&pwd=${encodeURIComponent(cred.pass)}`,
+                signal: AbortSignal.timeout(5000),
+                redirect: "manual",
+              });
+
+              if (loginAttempt.status >= 300 && loginAttempt.status < 400) {
+                const loc = loginAttempt.headers.get("location") || "";
+                if (loc.includes("dashboard") || loc.includes("admin") || loc.includes("panel") || loc.includes("profile") || loc.includes("wp-admin")) {
+                  findings.push(finding("CRITICAL", "Authentication", `Default credentials work: ${cred.user}/${cred.pass} on ${credPath}`,
+                    `Successfully authenticated using default credentials (${cred.user}/${cred.pass}) at ${credPath}. The server redirected to '${loc}', indicating a successful login. This is a critical vulnerability — change all default passwords immediately and enforce strong password policies.`));
+                  break;
+                }
+              }
+
+              if (loginAttempt.status === 200) {
+                const attemptBody = await loginAttempt.text();
+                const attemptLower = attemptBody.toLowerCase();
+                if ((attemptLower.includes("dashboard") || attemptLower.includes("welcome") || attemptLower.includes("logged in") || attemptLower.includes("my account") || attemptLower.includes("sign out") || attemptLower.includes("log out")) &&
+                    !attemptLower.includes("invalid") && !attemptLower.includes("incorrect") && !attemptLower.includes("failed")) {
+                  findings.push(finding("CRITICAL", "Authentication", `Default credentials may work: ${cred.user}/${cred.pass} on ${credPath}`,
+                    `Submitting default credentials (${cred.user}/${cred.pass}) at ${credPath} returned a response containing success indicators (dashboard/welcome content). Verify and change these credentials immediately.`));
+                  break;
+                }
+              }
+            } catch {}
+          }
+          break;
+        } catch {}
+      }
+
+      const sessionHeaders = ["set-cookie", "authorization", "x-auth-token", "x-csrf-token"];
+      const hasSessionMgmt = sessionHeaders.some(h => headers[h]);
+      if (hasSessionMgmt && authDetected) {
+        if (!headers["strict-transport-security"] && urlObj.protocol === "https:") {
+          findings.push(finding("HIGH", "Authentication", "Authentication over HTTPS without HSTS",
+            "The site uses authentication over HTTPS but lacks HSTS. An attacker can perform SSL stripping to downgrade the first connection to HTTP and intercept login credentials in transit."));
+        }
+
+        if (headers["set-cookie"] && !headers["set-cookie"].toLowerCase().includes("secure")) {
+          findings.push(finding("HIGH", "Authentication", "Session cookie missing Secure flag",
+            "The session cookie is set without the 'Secure' flag, meaning it will be sent over unencrypted HTTP connections. An attacker monitoring network traffic can steal the session cookie and hijack authenticated sessions."));
+        }
+      }
+    }
+
+    // ──────────────────────────────────────
     // BUILD CDN/WAF FINDING
     // ──────────────────────────────────────
     if (detectedProviders.length > 0) {

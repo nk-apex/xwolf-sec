@@ -362,7 +362,7 @@ function ScanLoading() {
           Running Deep Analysis...
         </h2>
         <p className="text-muted-foreground font-mono text-[10px] tracking-widest">
-          DNS &bull; HEADERS &bull; BOT DETECTION &bull; CORS &bull; SSL/TLS &bull; RATE LIMITING
+          DNS &bull; HEADERS &bull; BOT DETECTION &bull; CORS &bull; SSL/TLS &bull; AUTH &bull; RATE LIMITING
         </p>
       </div>
     </div>
