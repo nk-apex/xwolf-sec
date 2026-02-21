@@ -20,25 +20,33 @@ export function Layout({ children }: { children: React.ReactNode }) {
     <div className="min-h-screen bg-background text-foreground flex flex-col md:flex-row font-sans relative overflow-hidden">
       <div className="neon-grid-bg" />
 
-      <header className="md:hidden flex items-center justify-between p-4 border-b border-primary/20 sticky top-0 z-50 bg-black/80 backdrop-blur-sm">
+      <header className="md:hidden flex items-center justify-between p-4 border-b border-primary/20 sticky top-0 z-50 bg-black/90 backdrop-blur-sm">
         <div className="flex items-center gap-2">
           <img src={logoPath} alt="XWOLF SEC" className="h-8 rounded" />
           <span className="font-bold tracking-tight text-white text-sm" data-testid="text-brand-mobile">XWOLF SEC</span>
         </div>
-        <Button data-testid="button-mobile-menu" variant="ghost" size="icon" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
+        <Button data-testid="button-mobile-menu" variant="ghost" size="icon" className="relative z-[60]" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
           {mobileMenuOpen ? <X /> : <Menu />}
         </Button>
       </header>
 
+      {mobileMenuOpen && (
+        <div
+          data-testid="overlay-mobile"
+          className="fixed inset-0 z-[45] md:hidden bg-black/80 backdrop-blur-sm"
+          onClick={() => setMobileMenuOpen(false)}
+        />
+      )}
+
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-40 border-r border-primary/20 transform transition-all duration-300 md:translate-x-0 md:static md:block bg-black/80 backdrop-blur-sm",
-          mobileMenuOpen ? "translate-x-0 w-60" : "-translate-x-full w-60",
+          "fixed inset-y-0 left-0 border-r border-primary/20 transform transition-all duration-300 md:translate-x-0 md:static md:block bg-black/95 backdrop-blur-sm",
+          mobileMenuOpen ? "translate-x-0 w-60 z-[55]" : "-translate-x-full w-60 z-[55]",
           sidebarCollapsed ? "md:w-[68px]" : "md:w-60"
         )}
       >
         <div className="h-full flex flex-col">
-          <div className="p-4 border-b border-primary/20">
+          <div className={cn("p-4 border-b border-primary/20", mobileMenuOpen && "mt-[60px] md:mt-0")}>
             <div className={cn("flex items-center gap-3 mb-1", sidebarCollapsed && "md:justify-center")}>
               <img src={logoPath} alt="XWOLF SEC" className={cn("rounded shrink-0", sidebarCollapsed ? "md:h-7" : "h-9")} />
               <h1 className={cn("font-bold text-base tracking-wider text-white", sidebarCollapsed && "md:hidden")} data-testid="text-brand">XWOLF SEC</h1>
@@ -54,6 +62,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                   key={item.href}
                   href={item.href}
                   data-testid={`link-nav-${item.label.toLowerCase().replace(/\s/g, "-")}`}
+                  onClick={() => setMobileMenuOpen(false)}
                   className={cn(
                     "flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all duration-200 relative",
                     sidebarCollapsed && "md:px-0 md:justify-center",
@@ -112,13 +121,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
       <main className="flex-1 overflow-auto relative z-10">
         <div className="relative container mx-auto p-4 md:p-8 max-w-7xl">{children}</div>
       </main>
-
-      {mobileMenuOpen && (
-        <div
-          className="fixed inset-0 z-30 md:hidden bg-black/70 backdrop-blur-sm"
-          onClick={() => setMobileMenuOpen(false)}
-        />
-      )}
     </div>
   );
 }

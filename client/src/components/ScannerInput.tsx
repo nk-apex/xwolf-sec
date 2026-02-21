@@ -27,23 +27,25 @@ export function ScannerInput() {
       <div className="relative group">
         <div className="absolute -inset-0.5 rounded-xl bg-primary/20 blur-sm opacity-0 group-hover:opacity-100 transition duration-500"></div>
         <div className="relative rounded-xl border border-primary/20 bg-black/30 backdrop-blur-sm overflow-hidden hover:border-primary/30 transition-colors">
-          <div className="flex items-center">
-            <div className="pl-4 text-primary/50">
-              <Terminal className="w-4 h-4" />
+          <div className="flex flex-col sm:flex-row sm:items-center">
+            <div className="flex items-center flex-1 min-w-0">
+              <div className="pl-3 sm:pl-4 text-primary/50 shrink-0">
+                <Terminal className="w-4 h-4" />
+              </div>
+              <Input
+                data-testid="input-url"
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
+                placeholder="Enter target URL..."
+                className="h-12 sm:h-14 pl-3 pr-3 border-0 bg-transparent font-mono text-xs sm:text-sm text-primary focus-visible:ring-0 focus-visible:ring-offset-0 placeholder:text-muted-foreground/50"
+              />
             </div>
-            <Input
-              data-testid="input-url"
-              value={url}
-              onChange={(e) => setUrl(e.target.value)}
-              placeholder="Enter target URL (e.g. https://example.com)"
-              className="h-14 pl-3 pr-32 border-0 bg-transparent font-mono text-sm text-primary focus-visible:ring-0 focus-visible:ring-offset-0 placeholder:text-muted-foreground/50"
-            />
-            <div className="pr-2">
+            <div className="px-2 pb-2 sm:pb-0 sm:pr-2 sm:pl-0">
               <Button
                 data-testid="button-analyze"
                 type="submit"
                 disabled={createScan.isPending}
-                className="h-10 px-6 font-bold font-mono text-xs tracking-wider bg-primary text-primary-foreground shadow-[0_0_15px_rgba(0,255,0,0.3)] hover:shadow-[0_0_25px_rgba(0,255,0,0.4)] transition-all duration-300 uppercase rounded-lg"
+                className="w-full sm:w-auto h-9 sm:h-10 px-4 sm:px-6 font-bold font-mono text-xs tracking-wider bg-primary text-primary-foreground shadow-[0_0_15px_rgba(0,255,0,0.3)] transition-all duration-300 uppercase rounded-lg"
               >
                 {createScan.isPending ? (
                   <>
@@ -64,7 +66,7 @@ export function ScannerInput() {
 
       <div className="flex justify-between mt-2 px-1 text-[9px] text-muted-foreground/50 font-mono tracking-widest uppercase">
         <span>SYS_READY</span>
-        <span>SEC_LEVEL: MAX</span>
+        <span className="hidden sm:inline">SEC_LEVEL: MAX</span>
         <span>ENCRYPTED</span>
       </div>
     </form>
