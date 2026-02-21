@@ -3,14 +3,14 @@ import { Shield, LayoutDashboard, History, Settings, Menu, X, Zap } from "lucide
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import faviconPath from "@assets/image_1771639152124.png";
+import logoPath from "@assets/image_1771640058636.png";
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const navItems = [
-    { href: "/", label: "Command Center", icon: LayoutDashboard },
+    { href: "/", label: "Dashboard", icon: LayoutDashboard },
     { href: "/history", label: "Scan History", icon: History },
     { href: "/settings", label: "Settings", icon: Settings },
   ];
@@ -19,7 +19,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
     <div className="min-h-screen bg-background text-foreground flex flex-col md:flex-row font-sans">
       <header className="md:hidden flex items-center justify-between p-4 border-b border-border sticky top-0 z-50" style={{ backgroundColor: 'var(--surface-color)', backdropFilter: 'blur(var(--backdrop-blur))' }}>
         <div className="flex items-center gap-2">
-          <img src={faviconPath} alt="XWOLF SEC" className="w-7 h-7 rounded" />
+          <img src={logoPath} alt="XWOLF SEC" className="h-8 rounded" />
           <span className="font-bold tracking-tight neon-text text-sm" data-testid="text-brand-mobile">XWOLF SEC</span>
         </div>
         <Button data-testid="button-mobile-menu" variant="ghost" size="icon" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
@@ -39,12 +39,12 @@ export function Layout({ children }: { children: React.ReactNode }) {
         }}
       >
         <div className="h-full flex flex-col">
-          <div className="p-5 flex items-center gap-3" style={{ borderBottom: '1px solid var(--border-color)' }}>
-            <img src={faviconPath} alt="XWOLF SEC" className="w-9 h-9 rounded-lg" style={{ border: '1px solid rgba(var(--primary-color-rgb), 0.2)' }} />
-            <div>
+          <div className="p-4" style={{ borderBottom: '1px solid var(--border-color)' }}>
+            <div className="flex items-center gap-3 mb-1">
+              <img src={logoPath} alt="XWOLF SEC" className="h-9 rounded" />
               <h1 className="font-bold text-base tracking-wider neon-text" data-testid="text-brand">XWOLF SEC</h1>
-              <p className="text-[9px] text-muted-foreground font-mono tracking-wider leading-tight">Security Analysis<br />& Threat Intelligence</p>
             </div>
+            <p className="text-[10px] text-muted-foreground font-mono tracking-wider pl-0.5">Security Analysis<br />& Threat Intelligence</p>
           </div>
 
           <nav className="flex-1 p-3 space-y-1 mt-2">

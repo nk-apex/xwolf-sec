@@ -25,7 +25,7 @@ export default function Dashboard() {
             data-testid="text-hero-title"
             className="text-xl sm:text-3xl font-bold mb-1 sm:mb-2 neon-text"
           >
-            Command Center
+            Security Analysis<br />& Threat Intelligence
           </h1>
           <p className="text-gray-400 font-mono text-xs sm:text-sm mb-6">
             Deep security analysis for DDoS resilience, scraping vulnerabilities,
@@ -38,10 +38,10 @@ export default function Dashboard() {
 
       <section className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4 mb-4 sm:mb-8" data-testid="section-stats">
         {[
-          { icon: Activity, label: "Total Scans", value: totalScans.toString(), isAlert: false },
-          { icon: ShieldCheck, label: "Secure Targets", value: secureCount.toString(), isAlert: false },
-          { icon: AlertTriangle, label: "Vulnerabilities", value: vulnerableCount.toString(), isAlert: vulnerableCount > 0 },
-          { icon: Server, label: "Active Monitors", value: "24/7", isAlert: false },
+          { icon: Activity, label: "Total Scans", value: totalScans.toString(), subValue: totalScans > 0 ? `${totalScans} targets analyzed` : "No scans yet", isAlert: false },
+          { icon: ShieldCheck, label: "Secure Targets", value: secureCount.toString(), subValue: secureCount > 0 ? `${secureCount} passed checks` : "No secure targets", isAlert: false },
+          { icon: AlertTriangle, label: "Vulnerabilities", value: vulnerableCount.toString(), subValue: vulnerableCount > 0 ? `${vulnerableCount} risks found` : "No vulnerabilities", isAlert: vulnerableCount > 0 },
+          { icon: Server, label: "Active Monitors", value: "24/7", subValue: "Real-time scanning", isAlert: false },
         ].map((stat, index) => (
           <motion.div
             key={stat.label}
@@ -76,6 +76,7 @@ export default function Dashboard() {
                   )} />
                 </div>
               </div>
+              <div className="mt-1.5 sm:mt-3 text-[9px] sm:text-xs text-gray-500 font-mono truncate">{stat.subValue}</div>
             </div>
           </motion.div>
         ))}
