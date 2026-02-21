@@ -21,6 +21,7 @@ export const scans = pgTable("scans", {
   headers: jsonb("headers").$type<Record<string, string>>().notNull().default({}),
   recommendations: jsonb("recommendations").$type<string[]>().notNull().default([]),
   findings: jsonb("findings").$type<Finding[]>().notNull().default([]),
+  sessionId: text("session_id"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

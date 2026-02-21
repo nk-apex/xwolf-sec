@@ -1,10 +1,25 @@
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import type { Server } from "http";
 import { storage } from "./storage";
 import { api } from "@shared/routes";
 import { z } from "zod";
 import * as dns from "dns/promises";
+import crypto from "crypto";
 import type { Finding, SeverityLevel } from "@shared/schema";
+
+function getSessionId(req: Request, res: Response): string {
+  let sessionId = req.cookies?.xwolf_sid;
+  if (!sessionId) {
+    sessionId = crypto.randomUUID();
+    res.cookie("xwolf_sid", sessionId, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: 365 * 24 * 60 * 60 * 1000,
+    });
+  }
+  return sessionId;
+}
 
 function finding(severity: SeverityLevel, category: string, title: string, detail: string): Finding {
   return { severity, category, title, detail };
@@ -876,7 +891,8 @@ export async function registerRoutes(
 ): Promise<Server> {
   app.get(api.scans.list.path, async (req, res) => {
     try {
-      const scansList = await storage.getScans();
+      const sessionId = getSessionId(req, res);
+      const scansList = await storage.getScans(sessionId);
       res.json(scansList);
     } catch (err) {
       res.status(500).json({ message: "Internal server error" });
@@ -897,9 +913,10 @@ export async function registerRoutes(
 
   app.post(api.scans.create.path, async (req, res) => {
     try {
+      const sessionId = getSessionId(req, res);
       const input = api.scans.create.input.parse(req.body);
       const analysisData = await analyzeUrl(input.url);
-      const scan = await storage.createScan(analysisData);
+      const scan = await storage.createScan({ ...analysisData, sessionId });
       res.status(201).json(scan);
     } catch (err) {
       if (err instanceof z.ZodError) {

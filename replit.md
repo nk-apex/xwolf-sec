@@ -74,4 +74,8 @@ Preferred communication style: Simple, everyday language.
 - Cybersecurity aesthetic with monospace font accents
 
 ## Recent Changes
+- 2026-02-21: Added session-based scan isolation — each visitor only sees their own scans via cookie-based session IDs
+- 2026-02-21: Added footer with WhatsApp contact info, community links, and "Project by Silent Wolf" branding
+- 2026-02-21: Added Matrix rain background with glowing neon green characters
+- 2026-02-21: Added Authentication & Registration detection module (14th security module)
 - 2026-02-21: Complete rebuild as XWOLF SEC vulnerability scanner with security analysis engine, dark cybersecurity dashboard, scan results with recommendations

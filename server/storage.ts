@@ -4,16 +4,19 @@ import {
   type InsertScan,
   type Scan,
 } from "@shared/schema";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, and } from "drizzle-orm";
 
 export interface IStorage {
-  getScans(): Promise<Scan[]>;
+  getScans(sessionId?: string): Promise<Scan[]>;
   getScan(id: number): Promise<Scan | undefined>;
   createScan(scan: InsertScan): Promise<Scan>;
 }
 
 export class DatabaseStorage implements IStorage {
-  async getScans(): Promise<Scan[]> {
+  async getScans(sessionId?: string): Promise<Scan[]> {
+    if (sessionId) {
+      return await db.select().from(scans).where(eq(scans.sessionId, sessionId)).orderBy(desc(scans.createdAt));
+    }
     return await db.select().from(scans).orderBy(desc(scans.createdAt));
   }
 
