@@ -4,11 +4,16 @@ import { storage } from "./storage";
 import { api } from "@shared/routes";
 import { z } from "zod";
 import * as dns from "dns/promises";
+import type { Finding, SeverityLevel } from "@shared/schema";
+
+function finding(severity: SeverityLevel, category: string, title: string, detail: string): Finding {
+  return { severity, category, title, detail };
+}
 
 async function analyzeUrl(targetUrl: string) {
   const urlObj = new URL(targetUrl);
 
-  let targetIp = null;
+  let targetIp: string | null = null;
   try {
     const lookup = await dns.lookup(urlObj.hostname);
     targetIp = lookup.address;
@@ -16,140 +21,530 @@ async function analyzeUrl(targetUrl: string) {
     console.error("DNS lookup failed", e);
   }
 
+  const findings: Finding[] = [];
   const recommendations: string[] = [];
   let isScrapable = true;
   let ddosProtected = false;
   let headers: Record<string, string> = {};
   let server = "Unknown";
+  let responseStatus = 0;
+  let responseBody = "";
 
+  // ──────────────────────────────────────
+  // 1. PRIMARY FETCH (browser-like)
+  // ──────────────────────────────────────
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000);
+    const timeoutId = setTimeout(() => controller.abort(), 12000);
 
     const response = await fetch(targetUrl, {
       method: "GET",
       headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        Accept:
-          "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
         "Accept-Language": "en-US,en;q=0.9",
       },
       signal: controller.signal,
     });
     clearTimeout(timeoutId);
+    responseStatus = response.status;
 
     response.headers.forEach((value, key) => {
       headers[key.toLowerCase()] = value;
     });
 
     try {
-      const botResponse = await fetch(targetUrl, {
+      responseBody = await response.text();
+    } catch {}
+
+    // ──────────────────────────────────────
+    // 2. BOT / SCRAPING DETECTION
+    // ──────────────────────────────────────
+    const botAgents = [
+      { name: "Googlebot", ua: "Googlebot/2.1 (+http://www.google.com/bot.html)" },
+      { name: "Python-requests", ua: "python-requests/2.31.0" },
+      { name: "curl", ua: "curl/8.4.0" },
+      { name: "Scrapy", ua: "Scrapy/2.11 (+https://scrapy.org)" },
+    ];
+
+    let blockedCount = 0;
+    const testedAgents: string[] = [];
+    const passedAgents: string[] = [];
+
+    for (const bot of botAgents) {
+      try {
+        const botRes = await fetch(targetUrl, {
+          method: "GET",
+          headers: { "User-Agent": bot.ua },
+          signal: AbortSignal.timeout(5000),
+        });
+        testedAgents.push(bot.name);
+        if (botRes.status === 403 || botRes.status === 429 || botRes.status === 503) {
+          blockedCount++;
+        } else {
+          passedAgents.push(bot.name);
+        }
+      } catch (e) {
+        blockedCount++;
+      }
+    }
+
+    if (blockedCount === botAgents.length) {
+      isScrapable = false;
+    } else if (blockedCount > 0) {
+      isScrapable = true;
+      findings.push(finding("MEDIUM", "Bot Protection", "Partial bot blocking detected",
+        `Only ${blockedCount}/${botAgents.length} known bot user-agents were blocked. Agents that passed: ${passedAgents.join(", ")}. Sophisticated scrapers can bypass user-agent based blocking by spoofing headers.`));
+    }
+
+    // ──────────────────────────────────────
+    // 3. CDN / WAF / DDoS DETECTION
+    // ──────────────────────────────────────
+    const cdnHeaders = [
+      { header: "cf-ray", provider: "Cloudflare" },
+      { header: "x-cloudflare-status", provider: "Cloudflare" },
+      { header: "cf-cache-status", provider: "Cloudflare" },
+      { header: "x-akamai-transformed", provider: "Akamai" },
+      { header: "x-cdn", provider: "Generic CDN" },
+      { header: "x-sucuri-id", provider: "Sucuri WAF" },
+      { header: "x-sucuri-cache", provider: "Sucuri WAF" },
+      { header: "x-amz-cf-id", provider: "AWS CloudFront" },
+      { header: "x-amz-cf-pop", provider: "AWS CloudFront" },
+      { header: "x-goog-generation", provider: "Google Cloud CDN" },
+      { header: "x-fastly-request-id", provider: "Fastly" },
+      { header: "x-served-by", provider: "Fastly/Varnish" },
+      { header: "x-vercel-id", provider: "Vercel Edge" },
+      { header: "x-nf-request-id", provider: "Netlify" },
+    ];
+
+    const detectedProviders: string[] = [];
+    for (const check of cdnHeaders) {
+      if (headers[check.header]) {
+        ddosProtected = true;
+        if (!detectedProviders.includes(check.provider)) {
+          detectedProviders.push(check.provider);
+        }
+      }
+    }
+
+    const serverLower = (headers["server"] || "").toLowerCase();
+    const wafServers = ["cloudflare", "sucuri", "imperva", "akamai", "fastly", "ddos-guard", "stackpath"];
+    for (const waf of wafServers) {
+      if (serverLower.includes(waf)) {
+        ddosProtected = true;
+        const provName = waf.charAt(0).toUpperCase() + waf.slice(1);
+        if (!detectedProviders.includes(provName)) {
+          detectedProviders.push(provName);
+        }
+      }
+    }
+
+    // ──────────────────────────────────────
+    // 4. robots.txt ANALYSIS
+    // ──────────────────────────────────────
+    try {
+      const robotsRes = await fetch(`${urlObj.origin}/robots.txt`, { signal: AbortSignal.timeout(3000) });
+      if (robotsRes.ok) {
+        const robotsText = await robotsRes.text();
+        if (!robotsText.includes("<!DOCTYPE") && !robotsText.includes("Cannot GET")) {
+          const hasDisallow = robotsText.includes("Disallow: /");
+          const allowsAll = robotsText.includes("Allow: /");
+          if (hasDisallow) {
+            findings.push(finding("LOW", "Crawl Policy", "robots.txt has restrictive directives",
+              "robots.txt contains Disallow rules, but this is only advisory. Malicious bots ignore robots.txt entirely. It should not be relied on for security."));
+          } else if (allowsAll) {
+            findings.push(finding("INFO", "Crawl Policy", "robots.txt allows all crawling",
+              "robots.txt explicitly allows all user-agents to crawl every path. This is expected for public sites but means no crawl restrictions are in place."));
+          }
+        }
+      } else {
+        findings.push(finding("INFO", "Crawl Policy", "No robots.txt found",
+          "The server returned an error for /robots.txt. While not a vulnerability, having one provides basic crawl control directives."));
+      }
+    } catch {}
+
+    // ──────────────────────────────────────
+    // 5. HTTP METHOD ENUMERATION
+    // ──────────────────────────────────────
+    const dangerousMethods: string[] = [];
+
+    // Only check via OPTIONS Allow header (reliable signal) and TRACE echo test
+    try {
+      const optRes = await fetch(targetUrl, { method: "OPTIONS", signal: AbortSignal.timeout(3000) });
+      const allow = optRes.headers.get("allow") || optRes.headers.get("access-control-allow-methods") || "";
+      if (allow) {
+        const allowedMethods = allow.split(",").map(m => m.trim().toUpperCase());
+        for (const m of ["PUT", "DELETE", "TRACE", "PATCH"]) {
+          if (allowedMethods.includes(m)) dangerousMethods.push(m);
+        }
+      }
+    } catch {}
+
+    // Verify TRACE separately — only flag if server echoes back the request (true TRACE behavior)
+    try {
+      const traceRes = await fetch(targetUrl, { method: "TRACE", signal: AbortSignal.timeout(3000) });
+      if (traceRes.ok) {
+        const traceBody = await traceRes.text();
+        if (traceBody.includes("TRACE") && traceBody.includes(urlObj.hostname)) {
+          if (!dangerousMethods.includes("TRACE")) dangerousMethods.push("TRACE");
+        }
+      }
+    } catch {}
+
+    if (dangerousMethods.length > 0) {
+      const unique = [...new Set(dangerousMethods)];
+      const hasTrace = unique.includes("TRACE");
+      findings.push(finding(
+        hasTrace ? "HIGH" : "MEDIUM",
+        "HTTP Methods",
+        `Server advertises dangerous HTTP methods: ${unique.join(", ")}`,
+        `The server's Allow header lists ${unique.join(", ")} as accepted methods.${hasTrace ? " TRACE is confirmed active and echoes requests back, enabling Cross-Site Tracing (XST) attacks that can steal credentials." : ""} PUT/DELETE/PATCH should be restricted to authenticated API routes only — verify these are not accessible on public endpoints.`
+      ));
+    }
+
+    // ──────────────────────────────────────
+    // 6. CORS ANALYSIS
+    // ──────────────────────────────────────
+    try {
+      const corsRes = await fetch(targetUrl, {
         method: "GET",
         headers: {
-          "User-Agent":
-            "Googlebot/2.1 (+http://www.google.com/bot.html)",
+          "User-Agent": "Mozilla/5.0",
+          "Origin": "https://evil-attacker.com",
         },
         signal: AbortSignal.timeout(5000),
       });
-      if (botResponse.status === 403 || botResponse.status === 429) {
-        isScrapable = false;
+
+      const acao = corsRes.headers.get("access-control-allow-origin");
+      const acac = corsRes.headers.get("access-control-allow-credentials");
+
+      if (acao === "*") {
+        if (acac === "true") {
+          findings.push(finding("CRITICAL", "CORS", "Wildcard CORS with credentials allowed",
+            "The server returns 'Access-Control-Allow-Origin: *' combined with 'Access-Control-Allow-Credentials: true'. This is a dangerous misconfiguration that allows any website to make authenticated requests to this origin and read the responses, potentially stealing user data."));
+        } else {
+          findings.push(finding("LOW", "CORS", "Wildcard CORS origin configured",
+            "The server returns 'Access-Control-Allow-Origin: *'. This allows any website to read responses from this API. If this endpoint serves sensitive data, restrict the origin to trusted domains."));
+        }
+      } else if (acao === "https://evil-attacker.com") {
+        findings.push(finding("HIGH", "CORS", "CORS reflects arbitrary origins",
+          "The server reflects the requesting Origin header back in 'Access-Control-Allow-Origin'. This means ANY website can make cross-origin requests and read responses, effectively bypassing the Same-Origin Policy. This is a serious misconfiguration."));
       }
-    } catch (e) {
-      isScrapable = false;
+    } catch {}
+
+    // ──────────────────────────────────────
+    // 7. COOKIE SECURITY
+    // ──────────────────────────────────────
+    const setCookieHeaders = response.headers.getSetCookie?.() || [];
+    const setCookieRaw = headers["set-cookie"];
+    const cookies = setCookieHeaders.length > 0
+      ? setCookieHeaders
+      : setCookieRaw ? [setCookieRaw] : [];
+
+    for (const cookie of cookies) {
+      const cookieName = cookie.split("=")[0]?.trim() || "unknown";
+      const issues: string[] = [];
+      const lc = cookie.toLowerCase();
+
+      if (!lc.includes("httponly")) issues.push("missing HttpOnly flag (accessible to JavaScript / XSS)");
+      if (!lc.includes("secure")) issues.push("missing Secure flag (sent over plain HTTP)");
+      if (!lc.includes("samesite")) issues.push("missing SameSite attribute (vulnerable to CSRF)");
+
+      if (issues.length > 0) {
+        findings.push(finding("MEDIUM", "Cookie Security", `Cookie '${cookieName}' has insecure attributes`,
+          `Issues: ${issues.join("; ")}. Cookies without proper security attributes are vulnerable to session hijacking, XSS-based theft, and cross-site request forgery.`));
+      }
     }
 
-    const securityHeaders = [
-      "x-cloudflare-status",
-      "cf-ray",
-      "x-akamai-transformed",
-      "x-cdn",
-      "x-sucuri-id",
-      "x-amz-cf-id",
-      "x-goog-generation",
-    ];
-    if (securityHeaders.some((h) => headers[h])) {
-      ddosProtected = true;
+    // ──────────────────────────────────────
+    // 8. INFORMATION LEAKAGE
+    // ──────────────────────────────────────
+    const xPoweredBy = headers["x-powered-by"];
+    if (xPoweredBy) {
+      findings.push(finding("MEDIUM", "Information Leakage", `X-Powered-By header exposes technology: ${xPoweredBy}`,
+        `The server reveals its backend framework (${xPoweredBy}) via the X-Powered-By header. This helps attackers identify known vulnerabilities specific to this technology stack. Remove this header in production.`));
+    }
+
+    const serverHeader = headers["server"];
+    if (serverHeader) {
+      const versionMatch = serverHeader.match(/[\d]+\.[\d]+/);
+      if (versionMatch) {
+        findings.push(finding("MEDIUM", "Information Leakage", `Server header leaks version: ${serverHeader}`,
+          `The Server header reveals the exact software version (${serverHeader}). Attackers can look up known CVEs for this version. Use a generic server name or remove the header entirely.`));
+      }
+    }
+
+    const xAspNet = headers["x-aspnet-version"] || headers["x-aspnetmvc-version"];
+    if (xAspNet) {
+      findings.push(finding("MEDIUM", "Information Leakage", `ASP.NET version exposed: ${xAspNet}`,
+        "The server reveals its ASP.NET framework version. Remove X-AspNet-Version and X-AspNetMvc-Version headers in production."));
+    }
+
+    // Check for debug/error info in HTML
+    if (responseBody) {
+      const leakPatterns = [
+        { pattern: /stack\s*trace/i, label: "Stack trace detected in response body" },
+        { pattern: /SQL\s*syntax.*error/i, label: "SQL error message found in response body" },
+        { pattern: /SQLSTATE/i, label: "Database error (SQLSTATE) found in response" },
+        { pattern: /Warning:.*on line \d+/i, label: "PHP warning with file path disclosed" },
+        { pattern: /\/home\/\w+\/|\/var\/www\//i, label: "Server file paths disclosed in response" },
+        { pattern: /<!--.*(?:TODO|FIXME|HACK|password|secret|api[_-]?key)/i, label: "Sensitive comments found in HTML source" },
+      ];
+      for (const lp of leakPatterns) {
+        if (lp.pattern.test(responseBody)) {
+          findings.push(finding("HIGH", "Information Leakage", lp.label,
+            "The response body contains sensitive debug or error information that should never be exposed in production. This helps attackers understand your internal architecture and find exploitable weaknesses."));
+        }
+      }
+    }
+
+    // ──────────────────────────────────────
+    // 9. SSL/TLS CHECKS (via headers heuristics)
+    // ──────────────────────────────────────
+    if (urlObj.protocol === "https:") {
+      // Test HTTP->HTTPS redirect
+      try {
+        const httpUrl = targetUrl.replace("https://", "http://");
+        const httpRes = await fetch(httpUrl, {
+          method: "HEAD",
+          redirect: "manual",
+          signal: AbortSignal.timeout(5000),
+        });
+        if (httpRes.status >= 300 && httpRes.status < 400) {
+          const location = httpRes.headers.get("location") || "";
+          if (location.startsWith("https://")) {
+            findings.push(finding("INFO", "SSL/TLS", "HTTP to HTTPS redirect is active",
+              `HTTP requests are redirected to HTTPS (${httpRes.status}). Good practice, but without HSTS the first request is still vulnerable to interception.`));
+          }
+        } else if (httpRes.status === 200) {
+          findings.push(finding("HIGH", "SSL/TLS", "Site accessible over plain HTTP without redirect",
+            "The site serves content over unencrypted HTTP without redirecting to HTTPS. An attacker on the network can intercept, read, and modify all traffic (passwords, session tokens, personal data)."));
+        }
+      } catch {}
+    }
+
+    // ──────────────────────────────────────
+    // 10. DNS INFRASTRUCTURE ANALYSIS
+    // ──────────────────────────────────────
+    const baseDomain = urlObj.hostname.split(".").slice(-2).join(".");
+
+    // Check if DNS uses Cloudflare but proxy is off
+    try {
+      const nsRecords = await dns.resolveNs(baseDomain);
+      const usesCloudflareNs = nsRecords.some(ns => ns.includes("cloudflare"));
+      if (usesCloudflareNs && !ddosProtected) {
+        findings.push(finding("HIGH", "DNS / Network", "Cloudflare DNS detected but proxy is DISABLED",
+          `The domain uses Cloudflare nameservers (${nsRecords.join(", ")}) but Cloudflare's proxy/WAF is not active. The origin server IP (${targetIp}) is directly exposed. Enable Cloudflare's orange-cloud proxy to hide the origin IP and enable DDoS protection.`));
+      }
+    } catch {}
+
+    // Check for DNSSEC
+    try {
+      const txtRecords = await dns.resolveTxt(`_dmarc.${baseDomain}`);
+      if (txtRecords.length === 0) {
+        findings.push(finding("LOW", "DNS / Email", "No DMARC record found",
+          `No DMARC TXT record at _dmarc.${baseDomain}. Without DMARC, attackers can spoof emails from your domain for phishing campaigns.`));
+      }
+    } catch {
+      findings.push(finding("LOW", "DNS / Email", "No DMARC record found",
+        `No DMARC TXT record at _dmarc.${baseDomain}. Without DMARC, attackers can spoof emails from your domain for phishing campaigns.`));
     }
 
     try {
-      const robotsRes = await fetch(`${urlObj.origin}/robots.txt`, {
-        signal: AbortSignal.timeout(3000),
-      });
-      if (robotsRes.ok) {
-        const text = await robotsRes.text();
-        if (text.includes("Disallow: /")) {
-          recommendations.push(
-            "robots.txt detected with restrictive directives, though this is only a 'polite' request and doesn't stop malicious scrapers."
-          );
+      const spfRecords = await dns.resolveTxt(baseDomain);
+      const hasSpf = spfRecords.some(r => r.join("").includes("v=spf1"));
+      if (!hasSpf) {
+        findings.push(finding("LOW", "DNS / Email", "No SPF record found",
+          `No SPF TXT record for ${baseDomain}. Without SPF, anyone can send emails pretending to be from your domain.`));
+      }
+    } catch {}
+
+    // ──────────────────────────────────────
+    // 11. RATE LIMITING CHECK
+    // ──────────────────────────────────────
+    try {
+      let rateLimited = false;
+      for (let i = 0; i < 10; i++) {
+        const rlRes = await fetch(targetUrl, {
+          method: "HEAD",
+          headers: { "User-Agent": "Mozilla/5.0" },
+          signal: AbortSignal.timeout(2000),
+        });
+        if (rlRes.status === 429 || rlRes.status === 503) {
+          rateLimited = true;
+          break;
         }
       }
-    } catch (e) {}
+      if (!rateLimited) {
+        findings.push(finding("MEDIUM", "Rate Limiting", "No rate limiting detected",
+          "Sending 10 rapid requests did not trigger any rate limiting (no 429 responses). This means the server is vulnerable to brute-force attacks, credential stuffing, and application-layer DDoS. Implement rate limiting on API endpoints and login routes."));
+      }
+    } catch {}
+
+    // ──────────────────────────────────────
+    // 12. OPEN REDIRECT CHECK
+    // ──────────────────────────────────────
+    try {
+      const redirectPayloads = [
+        `${urlObj.origin}/redirect?url=https://evil.com`,
+        `${urlObj.origin}/login?next=https://evil.com`,
+        `${urlObj.origin}/login?redirect=https://evil.com`,
+        `${urlObj.origin}//evil.com`,
+      ];
+      for (const payload of redirectPayloads) {
+        try {
+          const rRes = await fetch(payload, { redirect: "manual", signal: AbortSignal.timeout(3000) });
+          const loc = rRes.headers.get("location") || "";
+          if (loc.includes("evil.com")) {
+            findings.push(finding("HIGH", "Open Redirect", "Open redirect vulnerability detected",
+              `The server redirects to an attacker-controlled domain when given a crafted URL parameter. Tested with: ${payload} → Location: ${loc}. This can be used for phishing attacks.`));
+            break;
+          }
+        } catch {}
+      }
+    } catch {}
+
+    // ──────────────────────────────────────
+    // 13. TECHNOLOGY FINGERPRINTING FROM HTML
+    // ──────────────────────────────────────
+    if (responseBody) {
+      const techFingerprints: { pattern: RegExp; tech: string }[] = [
+        { pattern: /react/i, tech: "React" },
+        { pattern: /vue/i, tech: "Vue.js" },
+        { pattern: /angular/i, tech: "Angular" },
+        { pattern: /next\.js|__next/i, tech: "Next.js" },
+        { pattern: /nuxt/i, tech: "Nuxt.js" },
+        { pattern: /wp-content|wordpress/i, tech: "WordPress" },
+        { pattern: /jquery/i, tech: "jQuery" },
+        { pattern: /bootstrap/i, tech: "Bootstrap" },
+        { pattern: /tailwind/i, tech: "Tailwind CSS" },
+        { pattern: /google-analytics|gtag/i, tech: "Google Analytics" },
+        { pattern: /googletag|doubleclick/i, tech: "Google Ads" },
+        { pattern: /hotjar/i, tech: "Hotjar" },
+        { pattern: /sentry/i, tech: "Sentry" },
+      ];
+
+      const detectedTech: string[] = [];
+      for (const tf of techFingerprints) {
+        if (tf.pattern.test(responseBody)) {
+          detectedTech.push(tf.tech);
+        }
+      }
+
+      if (detectedTech.length > 0) {
+        findings.push(finding("INFO", "Technology Stack", `Detected frontend technologies: ${detectedTech.join(", ")}`,
+          `Client-side analysis reveals the following technologies: ${detectedTech.join(", ")}. This information is typically available to anyone inspecting the page source but can help attackers target framework-specific vulnerabilities.`));
+      }
+    }
+
+    // ──────────────────────────────────────
+    // BUILD CDN/WAF FINDING
+    // ──────────────────────────────────────
+    if (detectedProviders.length > 0) {
+      findings.push(finding("INFO", "CDN / WAF", `Edge protection detected: ${detectedProviders.join(", ")}`,
+        `The site is behind ${detectedProviders.join(", ")} which provides DDoS mitigation and/or WAF capabilities. The origin server IP is likely hidden.`));
+    }
+
+    // ──────────────────────────────────────
+    // SCRAPING VERDICT
+    // ──────────────────────────────────────
+    if (isScrapable) {
+      if (blockedCount === 0) {
+        findings.push(finding("CRITICAL", "Scraping Protection", "No bot protection — all scrapers pass through",
+          `All ${botAgents.length} tested bot user-agents (${testedAgents.join(", ")}) received HTTP 200 OK. The site has no scraping defenses whatsoever. Implement TLS fingerprinting, JS challenges (e.g., Cloudflare Turnstile), or a Web Application Firewall.`));
+      }
+      recommendations.push("CRITICAL: The site lacks technical scraping protection. Implement TLS fingerprinting checks or a JS-based challenge (e.g., Turnstile).");
+    } else {
+      findings.push(finding("INFO", "Scraping Protection", "Bot protection is active",
+        "All tested bot user-agents were blocked or challenged. The site has effective scraping defenses in place."));
+    }
+
+    // DDoS verdict
+    if (!ddosProtected) {
+      findings.push(finding("CRITICAL", "DDoS Protection", `No DDoS protection — Origin IP ${targetIp || "unknown"} is directly exposed`,
+        `The origin server (${targetIp}) is directly reachable on the internet without any CDN, WAF, or DDoS mitigation proxy. A Layer 7 flood attack can take the site offline. Deploy Cloudflare proxy, AWS Shield, or a similar service.`));
+      recommendations.push(`VULNERABILITY: Origin IP (${targetIp || "unknown"}) is directly reachable. Implement a proxy-based WAF to mitigate Layer 7 DDoS floods.`);
+    }
+
+    // ──────────────────────────────────────
+    // SECURITY HEADER ANALYSIS
+    // ──────────────────────────────────────
+    if (!headers["strict-transport-security"]) {
+      findings.push(finding("HIGH", "Security Headers", "Missing Strict-Transport-Security (HSTS)",
+        "Without HSTS, browsers will attempt plain HTTP connections before upgrading to HTTPS. An attacker performing a man-in-the-middle attack can intercept the initial HTTP request and downgrade the connection (SSL stripping). Add: Strict-Transport-Security: max-age=31536000; includeSubDomains; preload"));
+      recommendations.push("RECOMMENDATION: Enable HSTS to prevent SSL stripping attacks.");
+    } else {
+      const hsts = headers["strict-transport-security"];
+      const maxAgeMatch = hsts.match(/max-age=(\d+)/);
+      if (maxAgeMatch && parseInt(maxAgeMatch[1]) < 15768000) {
+        findings.push(finding("LOW", "Security Headers", "HSTS max-age is too short",
+          `Current HSTS max-age is ${maxAgeMatch[1]} seconds (${Math.round(parseInt(maxAgeMatch[1]) / 86400)} days). Recommended minimum is 6 months (15768000 seconds). Short values leave a window for SSL stripping.`));
+      }
+      if (!hsts.includes("includeSubDomains")) {
+        findings.push(finding("LOW", "Security Headers", "HSTS missing includeSubDomains",
+          "HSTS is set but doesn't include the 'includeSubDomains' directive. Subdomains remain vulnerable to SSL stripping attacks."));
+      }
+    }
+
+    if (!headers["content-security-policy"]) {
+      findings.push(finding("HIGH", "Security Headers", "Missing Content-Security-Policy (CSP)",
+        "Without a CSP, the browser will execute any inline scripts and load resources from any origin. This makes the site vulnerable to XSS attacks where an attacker injects malicious JavaScript. Define a restrictive CSP that limits script sources: Content-Security-Policy: default-src 'self'; script-src 'self'"));
+      recommendations.push("RECOMMENDATION: Define a CSP to prevent cross-site scripting (XSS) and data injection.");
+    } else {
+      const csp = headers["content-security-policy"];
+      if (csp.includes("'unsafe-inline'") || csp.includes("'unsafe-eval'")) {
+        findings.push(finding("MEDIUM", "Security Headers", "CSP uses unsafe directives",
+          `The Content-Security-Policy contains 'unsafe-inline' or 'unsafe-eval', which significantly weakens XSS protection. These directives allow inline scripts and eval() to execute, which are the primary vectors for XSS exploitation.`));
+      }
+    }
+
+    if (!headers["x-content-type-options"]) {
+      findings.push(finding("MEDIUM", "Security Headers", "Missing X-Content-Type-Options",
+        "Without 'X-Content-Type-Options: nosniff', browsers may try to MIME-sniff the content type, potentially executing uploaded files as scripts. This enables certain XSS and drive-by-download attacks."));
+      recommendations.push("RECOMMENDATION: Add 'X-Content-Type-Options: nosniff' to prevent MIME-type sniffing.");
+    }
+
+    if (!headers["x-frame-options"] && !(headers["content-security-policy"] || "").includes("frame-ancestors")) {
+      findings.push(finding("MEDIUM", "Security Headers", "Missing X-Frame-Options (clickjacking risk)",
+        "The site can be embedded in an iframe on any domain. An attacker can overlay invisible buttons on top of the framed page to trick users into performing unintended actions (clickjacking). Add: X-Frame-Options: DENY or use CSP frame-ancestors."));
+      recommendations.push("RECOMMENDATION: Add 'X-Frame-Options: DENY' or 'SAMEORIGIN' to prevent clickjacking.");
+    }
+
+    if (!headers["referrer-policy"]) {
+      findings.push(finding("LOW", "Security Headers", "Missing Referrer-Policy",
+        "Without a Referrer-Policy, the browser sends the full URL (including query parameters with potentially sensitive tokens) as a Referer header when navigating to other sites. Set: Referrer-Policy: strict-origin-when-cross-origin"));
+      recommendations.push("RECOMMENDATION: Set a 'Referrer-Policy' to control how much referrer information is shared.");
+    }
+
+    if (!headers["permissions-policy"]) {
+      findings.push(finding("LOW", "Security Headers", "Missing Permissions-Policy",
+        "Without a Permissions-Policy (formerly Feature-Policy), the browser allows all features (camera, microphone, geolocation, etc.) by default. If the site is framed, the embedding page inherits these permissions. Set: Permissions-Policy: camera=(), microphone=(), geolocation=()"));
+      recommendations.push("RECOMMENDATION: Implement a 'Permissions-Policy' to restrict browser features.");
+    }
+
+    if (!headers["x-xss-protection"]) {
+      findings.push(finding("INFO", "Security Headers", "Missing X-XSS-Protection",
+        "The X-XSS-Protection header is deprecated in modern browsers (CSP is preferred), but setting 'X-XSS-Protection: 0' is recommended to prevent old browser XSS filter edge cases. Not a critical finding if CSP is properly configured."));
+    }
+
+    if (!headers["cross-origin-opener-policy"]) {
+      findings.push(finding("LOW", "Security Headers", "Missing Cross-Origin-Opener-Policy (COOP)",
+        "Without COOP, the page may share its browsing context with cross-origin popups, potentially enabling Spectre-type side-channel attacks. Set: Cross-Origin-Opener-Policy: same-origin"));
+    }
+
+    if (!headers["cross-origin-resource-policy"]) {
+      findings.push(finding("LOW", "Security Headers", "Missing Cross-Origin-Resource-Policy (CORP)",
+        "Without CORP, the site's resources can be loaded by any cross-origin page, which could leak information. Set: Cross-Origin-Resource-Policy: same-origin"));
+    }
+
   } catch (e) {
     console.error("Fetch failed", e);
-    recommendations.push(
-      "Ensure the site is reachable and has a valid SSL certificate."
-    );
+    findings.push(finding("CRITICAL", "Connectivity", "Failed to reach target",
+      "Could not establish a connection to the target URL. The site may be down, have an invalid SSL certificate, or be blocking requests from this scanner's IP range."));
+    recommendations.push("Ensure the site is reachable and has a valid SSL certificate.");
   }
 
   server = headers["server"] || "Unknown";
-  const serverLower = server.toLowerCase();
-  if (
-    serverLower.includes("cloudflare") ||
-    serverLower.includes("sucuri") ||
-    serverLower.includes("imperva") ||
-    serverLower.includes("akamai")
-  ) {
-    ddosProtected = true;
-  }
-
-  if (isScrapable) {
-    recommendations.push(
-      "CRITICAL: The site lacks technical scraping protection. It's recommended to implement TLS fingerprinting checks or a JS-based challenge (e.g., Turnstile)."
-    );
-  }
-
-  if (!ddosProtected) {
-    recommendations.push(
-      `VULNERABILITY: Origin IP (${targetIp || "unknown"}) is directly reachable. Implement a proxy-based WAF to mitigate Layer 7 DDoS floods.`
-    );
-  }
-
-  if (!headers["strict-transport-security"]) {
-    recommendations.push(
-      "RECOMMENDATION: Enable HSTS to prevent SSL stripping attacks."
-    );
-  }
-
-  if (!headers["content-security-policy"]) {
-    recommendations.push(
-      "RECOMMENDATION: Define a CSP to prevent cross-site scripting (XSS) and data injection."
-    );
-  }
-
-  if (!headers["x-content-type-options"]) {
-    recommendations.push(
-      "RECOMMENDATION: Add 'X-Content-Type-Options: nosniff' to prevent MIME-type sniffing."
-    );
-  }
-
-  if (!headers["x-frame-options"]) {
-    recommendations.push(
-      "RECOMMENDATION: Add 'X-Frame-Options: DENY' or 'SAMEORIGIN' to prevent clickjacking."
-    );
-  }
-
-  if (!headers["referrer-policy"]) {
-    recommendations.push(
-      "RECOMMENDATION: Set a 'Referrer-Policy' (e.g., 'strict-origin-when-cross-origin') to control how much referrer information is shared."
-    );
-  }
-
-  if (!headers["permissions-policy"]) {
-    recommendations.push(
-      "RECOMMENDATION: Implement a 'Permissions-Policy' to restrict browser features like camera, microphone, or geolocation."
-    );
-  }
 
   return {
     url: targetUrl,
@@ -159,6 +554,7 @@ async function analyzeUrl(targetUrl: string) {
     ddosProtected,
     headers,
     recommendations,
+    findings,
   };
 }
 
@@ -200,6 +596,7 @@ export async function registerRoutes(
           field: err.errors[0].path.join("."),
         });
       }
+      console.error("Scan error:", err);
       res.status(500).json({ message: "Failed to perform scan" });
     }
   });

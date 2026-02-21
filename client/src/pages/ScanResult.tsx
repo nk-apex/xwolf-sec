@@ -1,22 +1,34 @@
 import { useScan } from "@/hooks/use-scans";
 import { useParams, Link } from "wouter";
-import { StatusBadge } from "@/components/StatusBadge";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import {
   ArrowLeft,
   Shield,
-  Globe,
   Lock,
   Unlock,
   Server,
   Terminal,
-  AlertOctagon,
   AlertTriangle,
+  ShieldAlert,
+  ShieldCheck,
+  AlertOctagon,
+  Info,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
+import { useState } from "react";
+import type { Finding, SeverityLevel } from "@shared/schema";
+
+const severityConfig: Record<SeverityLevel, { color: string; bg: string; border: string; icon: typeof AlertOctagon; order: number }> = {
+  CRITICAL: { color: "text-red-500", bg: "bg-red-500/10", border: "border-red-500/30", icon: AlertOctagon, order: 0 },
+  HIGH: { color: "text-orange-500", bg: "bg-orange-500/10", border: "border-orange-500/30", icon: ShieldAlert, order: 1 },
+  MEDIUM: { color: "text-yellow-500", bg: "bg-yellow-500/10", border: "border-yellow-500/30", icon: AlertTriangle, order: 2 },
+  LOW: { color: "text-blue-400", bg: "bg-blue-400/10", border: "border-blue-400/30", icon: Info, order: 3 },
+  INFO: { color: "text-gray-400", bg: "bg-gray-400/10", border: "border-gray-400/30", icon: Info, order: 4 },
+};
 
 export default function ScanResult() {
   const { id } = useParams();
@@ -24,6 +36,18 @@ export default function ScanResult() {
 
   if (isLoading) return <ScanLoading />;
   if (error || !scan) return <ScanError />;
+
+  const findings: Finding[] = (scan.findings as Finding[]) || [];
+  const sortedFindings = [...findings].sort(
+    (a, b) => (severityConfig[a.severity]?.order ?? 5) - (severityConfig[b.severity]?.order ?? 5)
+  );
+
+  const severityCounts = findings.reduce<Record<string, number>>((acc, f) => {
+    acc[f.severity] = (acc[f.severity] || 0) + 1;
+    return acc;
+  }, {});
+
+  const categories = [...new Set(findings.map((f) => f.category))];
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
@@ -64,7 +88,6 @@ export default function ScanResult() {
               : "Anti-bot measures detected"
           }
         />
-
         <ResultCard
           title="DDoS Protection"
           icon={Shield}
@@ -72,11 +95,10 @@ export default function ScanResult() {
           value={scan.ddosProtected ? "Active" : "Inactive"}
           description={
             scan.ddosProtected
-              ? "WAF / Cloudflare detected"
+              ? "WAF / CDN protection detected"
               : "No edge protection found"
           }
         />
-
         <Card className="cyber-card col-span-1 md:col-span-2 bg-gradient-to-br from-card to-card/50">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
@@ -100,24 +122,54 @@ export default function ScanResult() {
         </Card>
       </div>
 
+      {findings.length > 0 && (
+        <div className="flex flex-wrap gap-3" data-testid="section-severity-summary">
+          {(["CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO"] as SeverityLevel[]).map((sev) => {
+            const count = severityCounts[sev] || 0;
+            if (count === 0) return null;
+            const cfg = severityConfig[sev];
+            return (
+              <div
+                key={sev}
+                className={cn("flex items-center gap-2 px-4 py-2 rounded-lg border font-mono text-sm", cfg.bg, cfg.border)}
+              >
+                <cfg.icon className={cn("w-4 h-4", cfg.color)} />
+                <span className={cfg.color}>
+                  {count} {sev}
+                </span>
+              </div>
+            );
+          })}
+          <div className="flex items-center gap-2 px-4 py-2 rounded-lg border border-border bg-card font-mono text-sm text-muted-foreground">
+            {findings.length} total findings
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-6">
           <div className="flex items-center justify-between">
             <h2 className="text-xl font-bold flex items-center gap-2">
-              <AlertOctagon className="w-5 h-5 text-yellow-500" /> Security
-              Recommendations
+              <ShieldAlert className="w-5 h-5 text-yellow-500" /> Security
+              Findings
             </h2>
+            <span className="text-sm text-muted-foreground font-mono">
+              {categories.length} categories
+            </span>
           </div>
 
-          <div className="space-y-4" data-testid="section-recommendations">
-            {scan.recommendations && scan.recommendations.length > 0 ? (
+          <div className="space-y-3" data-testid="section-findings">
+            {sortedFindings.length > 0 ? (
+              sortedFindings.map((f, idx) => (
+                <FindingCard key={idx} finding={f} index={idx} />
+              ))
+            ) : scan.recommendations && scan.recommendations.length > 0 ? (
               scan.recommendations.map((rec, idx) => (
                 <motion.div
                   key={idx}
                   initial={{ x: -20, opacity: 0 }}
                   animate={{ x: 0, opacity: 1 }}
                   transition={{ delay: idx * 0.1 }}
-                  data-testid={`text-recommendation-${idx}`}
                   className="p-4 rounded-xl border border-l-4 border-l-yellow-500 border-border bg-card/80 flex gap-4 items-start shadow-sm"
                 >
                   <div className="min-w-[24px] pt-1">
@@ -125,18 +177,15 @@ export default function ScanResult() {
                       {idx + 1}
                     </div>
                   </div>
-                  <div>
-                    <p className="text-foreground leading-relaxed">{rec}</p>
-                  </div>
+                  <p className="text-foreground leading-relaxed">{rec}</p>
                 </motion.div>
               ))
             ) : (
               <div className="p-8 border border-dashed border-green-500/30 bg-green-500/5 rounded-xl text-center">
-                <Shield className="w-12 h-12 text-green-500 mx-auto mb-3 opacity-50" />
+                <ShieldCheck className="w-12 h-12 text-green-500 mx-auto mb-3 opacity-50" />
                 <h3 className="font-medium text-green-500">All Clear</h3>
                 <p className="text-sm text-green-500/70">
-                  No immediate vulnerabilities detected based on current scan
-                  profile.
+                  No immediate vulnerabilities detected.
                 </p>
               </div>
             )}
@@ -146,14 +195,13 @@ export default function ScanResult() {
         <div className="space-y-6">
           <div className="flex items-center justify-between">
             <h2 className="text-xl font-bold flex items-center gap-2">
-              <Terminal className="w-5 h-5 text-muted-foreground" /> Header
-              Analysis
+              <Terminal className="w-5 h-5 text-muted-foreground" /> Headers
             </h2>
           </div>
 
           <Card className="cyber-card h-fit max-h-[600px] overflow-auto">
             <CardContent className="p-0">
-              <div className="bg-black/40 p-2 border-b border-border/50 sticky top-0 backdrop-blur-md">
+              <div className="bg-black/40 p-2 border-b border-border/50 sticky top-0 backdrop-blur-md z-10">
                 <div className="flex gap-1.5 px-2 py-1">
                   <div className="w-3 h-3 rounded-full bg-red-500/50" />
                   <div className="w-3 h-3 rounded-full bg-yellow-500/50" />
@@ -181,6 +229,78 @@ export default function ScanResult() {
         </div>
       </div>
     </div>
+  );
+}
+
+function FindingCard({ finding, index }: { finding: Finding; index: number }) {
+  const [expanded, setExpanded] = useState(
+    finding.severity === "CRITICAL" || finding.severity === "HIGH"
+  );
+  const cfg = severityConfig[finding.severity];
+
+  return (
+    <motion.div
+      initial={{ x: -20, opacity: 0 }}
+      animate={{ x: 0, opacity: 1 }}
+      transition={{ delay: Math.min(index * 0.05, 0.5) }}
+      data-testid={`finding-${index}`}
+      className={cn(
+        "rounded-xl border border-l-4 bg-card/80 shadow-sm overflow-hidden",
+        cfg.border
+      )}
+    >
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="w-full flex items-start gap-3 p-4 text-left hover:bg-secondary/20 transition-colors"
+        data-testid={`button-finding-toggle-${index}`}
+      >
+        <div className="min-w-[28px] pt-0.5">
+          <div
+            className={cn(
+              "w-7 h-7 rounded-full flex items-center justify-center border",
+              cfg.bg,
+              cfg.border
+            )}
+          >
+            <cfg.icon className={cn("w-3.5 h-3.5", cfg.color)} />
+          </div>
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-1 flex-wrap">
+            <span
+              className={cn(
+                "text-[10px] font-bold font-mono px-2 py-0.5 rounded",
+                cfg.bg,
+                cfg.color
+              )}
+            >
+              {finding.severity}
+            </span>
+            <span className="text-[10px] text-muted-foreground font-mono px-2 py-0.5 rounded bg-secondary/50">
+              {finding.category}
+            </span>
+          </div>
+          <p className="text-sm font-medium text-foreground leading-snug">
+            {finding.title}
+          </p>
+        </div>
+        <div className="pt-1 text-muted-foreground">
+          {expanded ? (
+            <ChevronUp className="w-4 h-4" />
+          ) : (
+            <ChevronDown className="w-4 h-4" />
+          )}
+        </div>
+      </button>
+
+      {expanded && (
+        <div className="px-4 pb-4 pl-[52px]">
+          <div className="text-sm text-muted-foreground leading-relaxed border-t border-border/50 pt-3">
+            {finding.detail}
+          </div>
+        </div>
+      )}
+    </motion.div>
   );
 }
 
@@ -246,10 +366,10 @@ function ScanLoading() {
       </div>
       <div className="text-center space-y-2">
         <h2 className="text-2xl font-bold animate-pulse">
-          Running Security Analysis...
+          Running Deep Security Analysis...
         </h2>
-        <p className="text-muted-foreground font-mono">
-          Probing firewall • Checking headers • Testing scrape defenses
+        <p className="text-muted-foreground font-mono text-sm">
+          DNS resolution • Header inspection • Bot detection • CORS analysis • SSL/TLS checks • Rate limiting
         </p>
       </div>
     </div>
