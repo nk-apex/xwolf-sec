@@ -4,6 +4,7 @@ import { ScanCard } from "@/components/ScanCard";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ShieldCheck, Server, AlertTriangle, Activity, Zap } from "lucide-react";
 import { motion } from "framer-motion";
+import { cn } from "@/lib/utils";
 
 export default function Dashboard() {
   const { data: scans, isLoading } = useScans();
@@ -23,7 +24,7 @@ export default function Dashboard() {
         >
           <h1
             data-testid="text-hero-title"
-            className="text-xl sm:text-3xl font-bold mb-1 sm:mb-2 neon-text"
+            className="text-xl sm:text-3xl font-bold mb-1 sm:mb-2 text-white"
           >
             Security Analysis<br />& Threat Intelligence
           </h1>
@@ -50,8 +51,10 @@ export default function Dashboard() {
             transition={{ delay: index * 0.1 }}
           >
             <div
-              className="surface-card p-3 sm:p-5 h-full"
-              style={stat.isAlert ? { borderColor: 'rgba(239, 68, 68, 0.2)' } : undefined}
+              className={cn(
+                "p-3 sm:p-5 rounded-xl border bg-black/30 backdrop-blur-sm group hover:border-primary/30 transition-colors h-full",
+                stat.isAlert ? "border-destructive/30" : "border-primary/20"
+              )}
             >
               <div className="flex justify-between items-start gap-1">
                 <div className="min-w-0 flex-1">
@@ -59,7 +62,7 @@ export default function Dashboard() {
                   <h3
                     className={cn(
                       "text-sm sm:text-2xl font-bold font-mono truncate",
-                      stat.isAlert ? "text-destructive" : "neon-text"
+                      stat.isAlert ? "text-destructive" : "text-white"
                     )}
                     data-testid={`text-stat-value-${stat.label.toLowerCase().replace(/\s+/g, '-')}`}
                   >
@@ -67,8 +70,10 @@ export default function Dashboard() {
                   </h3>
                 </div>
                 <div
-                  className="p-1 sm:p-2 rounded-lg shrink-0"
-                  style={{ backgroundColor: stat.isAlert ? 'rgba(239, 68, 68, 0.1)' : 'rgba(var(--primary-color-rgb), 0.1)' }}
+                  className={cn(
+                    "p-1 sm:p-2 rounded-lg shrink-0",
+                    stat.isAlert ? "bg-destructive/10" : "bg-primary/10"
+                  )}
                 >
                   <stat.icon className={cn(
                     "w-3.5 h-3.5 sm:w-5 sm:h-5",
@@ -84,8 +89,8 @@ export default function Dashboard() {
 
       <section className="space-y-4 sm:space-y-6">
         <h2 className="text-base sm:text-xl font-bold flex items-center">
-          <Zap className="w-4 h-4 sm:w-5 sm:h-5 mr-2 text-primary drop-shadow-[0_0_4px_rgba(0,255,0,0.5)]" />
-          <span className="neon-text">Recent Scans</span>
+          <Zap className="w-4 h-4 sm:w-5 sm:h-5 mr-2 text-primary" />
+          Recent Scans
         </h2>
 
         {isLoading ? (
@@ -93,7 +98,7 @@ export default function Dashboard() {
             {[1, 2, 3].map((i) => (
               <div
                 key={i}
-                className="surface-card p-6 space-y-4 h-48"
+                className="p-6 space-y-4 h-48 rounded-xl border border-primary/20 bg-black/30 backdrop-blur-sm"
               >
                 <Skeleton className="h-6 w-3/4" />
                 <Skeleton className="h-4 w-1/2" />
@@ -104,8 +109,7 @@ export default function Dashboard() {
         ) : scans?.length === 0 ? (
           <div
             data-testid="text-empty-scans"
-            className="text-center py-16 rounded-xl"
-            style={{ border: '1px dashed var(--border-color)', backgroundColor: 'rgba(var(--surface-color-rgb), 0.3)' }}
+            className="text-center py-16 rounded-xl border border-dashed border-primary/20 bg-black/20"
           >
             <ShieldCheck className="w-12 h-12 mx-auto text-primary/30 mb-4" />
             <h3 className="text-lg font-medium text-primary/60">No scans yet</h3>
@@ -130,8 +134,4 @@ export default function Dashboard() {
       </section>
     </div>
   );
-}
-
-function cn(...classes: (string | boolean | undefined)[]) {
-  return classes.filter(Boolean).join(" ");
 }

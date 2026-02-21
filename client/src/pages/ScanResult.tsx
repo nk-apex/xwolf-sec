@@ -1,7 +1,6 @@
 import { useScan } from "@/hooks/use-scans";
 import { useParams, Link } from "wouter";
 import { Button } from "@/components/ui/button";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import {
   ArrowLeft,
   Shield,
@@ -68,7 +67,7 @@ export default function ScanResult() {
             data-testid="text-scan-target"
             className="text-xl font-bold font-mono tracking-tight flex items-center gap-2"
           >
-            <span className="text-muted-foreground">TARGET:</span> <span className="neon-text">{scan.url}</span>
+            <span className="text-muted-foreground">TARGET:</span> <span className="text-white">{scan.url}</span>
           </h1>
           <p className="text-muted-foreground text-xs font-mono tracking-wider">
             ID: #{scan.id.toString().padStart(6, "0")} &bull;{" "}
@@ -100,27 +99,25 @@ export default function ScanResult() {
               : "No edge protection found"
           }
         />
-        <Card className="cyber-card col-span-1 md:col-span-2">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-xs font-mono font-medium text-muted-foreground flex items-center gap-2 tracking-widest uppercase">
-              <Server className="w-4 h-4 text-primary/50" /> Target Infrastructure
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex items-center justify-between p-3 bg-background/50 rounded-lg border border-border/30">
+        <div className="p-3 sm:p-5 rounded-xl border border-primary/20 bg-black/30 backdrop-blur-sm col-span-1 md:col-span-2">
+          <h3 className="text-xs font-mono font-medium text-muted-foreground flex items-center gap-2 tracking-widest uppercase mb-4">
+            <Server className="w-4 h-4 text-primary/50" /> Target Infrastructure
+          </h3>
+          <div className="space-y-3">
+            <div className="flex items-center justify-between p-3 bg-black/40 rounded-lg border border-primary/10">
               <span className="text-xs text-muted-foreground font-mono">IP Address</span>
-              <code data-testid="text-target-ip" className="font-mono text-sm neon-text">
+              <code data-testid="text-target-ip" className="font-mono text-sm text-white">
                 {scan.targetIp || "Unknown"}
               </code>
             </div>
-            <div className="flex items-center justify-between p-3 bg-background/50 rounded-lg border border-border/30">
+            <div className="flex items-center justify-between p-3 bg-black/40 rounded-lg border border-primary/10">
               <span className="text-xs text-muted-foreground font-mono">Server Tech</span>
               <code data-testid="text-server-tech" className="font-mono text-sm text-primary/70">
                 {scan.server || "Hidden"}
               </code>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </div>
 
       {findings.length > 0 && (
@@ -141,7 +138,7 @@ export default function ScanResult() {
               </div>
             );
           })}
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-border bg-card font-mono text-xs text-muted-foreground">
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-primary/20 bg-black/30 font-mono text-xs text-muted-foreground">
             {findings.length} total findings
           </div>
         </div>
@@ -150,8 +147,8 @@ export default function ScanResult() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-5">
           <div className="flex items-center gap-3">
-            <Zap className="w-4 h-4 text-primary drop-shadow-[0_0_4px_rgba(0,255,0,0.5)]" />
-            <h2 className="text-lg font-bold neon-text tracking-wide">
+            <Zap className="w-4 h-4 text-primary" />
+            <h2 className="text-lg font-bold text-white tracking-wide">
               Security Findings
             </h2>
             <span className="text-xs text-muted-foreground font-mono ml-auto">
@@ -171,14 +168,14 @@ export default function ScanResult() {
                   initial={{ x: -20, opacity: 0 }}
                   animate={{ x: 0, opacity: 1 }}
                   transition={{ delay: idx * 0.1 }}
-                  className="p-4 rounded-xl border border-l-4 border-l-yellow-500/60 border-border/30 bg-card/80 flex gap-4 items-start"
+                  className="p-4 rounded-xl border border-l-4 border-l-yellow-500/60 border-primary/20 bg-black/30 backdrop-blur-sm flex gap-4 items-start"
                 >
                   <div className="min-w-[24px] pt-1">
                     <div className="w-6 h-6 rounded-full bg-yellow-500/10 text-yellow-500 flex items-center justify-center text-xs font-bold font-mono border border-yellow-500/20">
                       {idx + 1}
                     </div>
                   </div>
-                  <p className="text-card-foreground text-sm leading-relaxed">{rec}</p>
+                  <p className="text-white text-sm leading-relaxed">{rec}</p>
                 </motion.div>
               ))
             ) : (
@@ -196,38 +193,36 @@ export default function ScanResult() {
         <div className="space-y-5">
           <div className="flex items-center gap-3">
             <Terminal className="w-4 h-4 text-primary/50" />
-            <h2 className="text-lg font-bold text-card-foreground tracking-wide">
+            <h2 className="text-lg font-bold text-white tracking-wide">
               Headers
             </h2>
           </div>
 
-          <Card className="cyber-card h-fit max-h-[600px] overflow-auto">
-            <CardContent className="p-0">
-              <div className="bg-black/60 p-2 border-b border-border/30 sticky top-0 backdrop-blur-md z-10">
-                <div className="flex gap-1.5 px-2 py-1">
-                  <div className="w-2.5 h-2.5 rounded-full bg-red-500/50" />
-                  <div className="w-2.5 h-2.5 rounded-full bg-yellow-500/50" />
-                  <div className="w-2.5 h-2.5 rounded-full bg-green-500/50" />
-                </div>
+          <div className="rounded-xl border border-primary/20 bg-black/30 backdrop-blur-sm h-fit max-h-[600px] overflow-auto">
+            <div className="bg-black/60 p-2 border-b border-primary/10 sticky top-0 backdrop-blur-md z-10">
+              <div className="flex gap-1.5 px-2 py-1">
+                <div className="w-2.5 h-2.5 rounded-full bg-red-500/50" />
+                <div className="w-2.5 h-2.5 rounded-full bg-yellow-500/50" />
+                <div className="w-2.5 h-2.5 rounded-full bg-green-500/50" />
               </div>
-              <div className="p-4 font-mono text-[11px] space-y-3" data-testid="section-headers">
-                {scan.headers && Object.keys(scan.headers).length > 0 ? (
-                  Object.entries(scan.headers).map(([key, value]) => (
-                    <div key={key} className="flex flex-col gap-0.5 break-all">
-                      <span className="text-primary/70 font-bold">{key}:</span>
-                      <span className="text-muted-foreground pl-4 border-l border-border/30">
-                        {String(value)}
-                      </span>
-                    </div>
-                  ))
-                ) : (
-                  <div className="text-muted-foreground italic">
-                    No header data captured.
+            </div>
+            <div className="p-4 font-mono text-[11px] space-y-3" data-testid="section-headers">
+              {scan.headers && Object.keys(scan.headers).length > 0 ? (
+                Object.entries(scan.headers).map(([key, value]) => (
+                  <div key={key} className="flex flex-col gap-0.5 break-all">
+                    <span className="text-primary/70 font-bold">{key}:</span>
+                    <span className="text-muted-foreground pl-4 border-l border-primary/10">
+                      {String(value)}
+                    </span>
                   </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
+                ))
+              ) : (
+                <div className="text-muted-foreground italic">
+                  No header data captured.
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -247,7 +242,7 @@ function FindingCard({ finding, index }: { finding: Finding; index: number }) {
       transition={{ delay: Math.min(index * 0.05, 0.5) }}
       data-testid={`finding-${index}`}
       className={cn(
-        "rounded-xl border border-l-4 bg-card/60 overflow-hidden",
+        "rounded-xl border border-l-4 bg-black/30 backdrop-blur-sm overflow-hidden",
         cfg.border
       )}
     >
@@ -278,11 +273,11 @@ function FindingCard({ finding, index }: { finding: Finding; index: number }) {
             >
               {finding.severity}
             </span>
-            <span className="text-[10px] text-muted-foreground font-mono px-2 py-0.5 rounded bg-secondary/50">
+            <span className="text-[10px] text-muted-foreground font-mono px-2 py-0.5 rounded bg-black/40">
               {finding.category}
             </span>
           </div>
-          <p className="text-sm font-medium text-card-foreground leading-snug">
+          <p className="text-sm font-medium text-white leading-snug">
             {finding.title}
           </p>
         </div>
@@ -297,7 +292,7 @@ function FindingCard({ finding, index }: { finding: Finding; index: number }) {
 
       {expanded && (
         <div className="px-4 pb-4 pl-[52px]">
-          <div className="text-xs text-muted-foreground leading-relaxed border-t border-border/30 pt-3 font-mono">
+          <div className="text-xs text-muted-foreground leading-relaxed border-t border-primary/10 pt-3 font-mono">
             {finding.detail}
           </div>
         </div>
@@ -309,10 +304,10 @@ function FindingCard({ finding, index }: { finding: Finding; index: number }) {
 function ResultCard({ title, icon: Icon, status, value, description }: any) {
   const isSecure = status === "secure";
   return (
-    <Card
+    <div
       className={cn(
-        "cyber-card relative overflow-hidden",
-        isSecure ? "border-primary/20" : "border-destructive/30"
+        "p-3 sm:p-5 rounded-xl border bg-black/30 backdrop-blur-sm relative overflow-hidden transition-colors",
+        isSecure ? "border-primary/20 hover:border-primary/30" : "border-destructive/30 hover:border-destructive/40"
       )}
     >
       <div className="absolute top-0 right-0 p-3 opacity-5">
@@ -323,36 +318,32 @@ function ResultCard({ title, icon: Icon, status, value, description }: any) {
           )}
         />
       </div>
-      <CardHeader className="pb-2">
-        <CardTitle className="text-[10px] font-mono font-medium text-muted-foreground tracking-widest uppercase">
-          {title}
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
+      <h3 className="text-[10px] font-mono font-medium text-muted-foreground tracking-widest uppercase mb-3">
+        {title}
+      </h3>
+      <div
+        className={cn(
+          "text-2xl font-bold font-mono mb-1",
+          isSecure ? "text-white" : "text-destructive"
+        )}
+      >
+        {value}
+      </div>
+      <p className="text-[10px] text-muted-foreground font-mono">{description}</p>
+      <div
+        className={cn(
+          "h-0.5 w-full mt-4 rounded-full",
+          isSecure ? "bg-primary/15" : "bg-destructive/15"
+        )}
+      >
         <div
           className={cn(
-            "text-2xl font-bold font-mono mb-1",
-            isSecure ? "neon-text" : "text-destructive"
+            "h-0.5 rounded-full w-3/4",
+            isSecure ? "bg-primary shadow-[0_0_4px_rgba(0,255,0,0.3)]" : "bg-destructive"
           )}
-        >
-          {value}
-        </div>
-        <p className="text-[10px] text-muted-foreground font-mono">{description}</p>
-        <div
-          className={cn(
-            "h-0.5 w-full mt-4 rounded-full",
-            isSecure ? "bg-primary/15" : "bg-destructive/15"
-          )}
-        >
-          <div
-            className={cn(
-              "h-0.5 rounded-full w-3/4",
-              isSecure ? "bg-primary shadow-[0_0_4px_rgba(0,255,0,0.3)]" : "bg-destructive"
-            )}
-          />
-        </div>
-      </CardContent>
-    </Card>
+        />
+      </div>
+    </div>
   );
 }
 
@@ -367,7 +358,7 @@ function ScanLoading() {
         </div>
       </div>
       <div className="text-center space-y-2">
-        <h2 className="text-xl font-bold neon-text animate-pulse font-mono">
+        <h2 className="text-xl font-bold text-white animate-pulse font-mono">
           Running Deep Analysis...
         </h2>
         <p className="text-muted-foreground font-mono text-[10px] tracking-widest">
@@ -391,7 +382,7 @@ function ScanError() {
       </p>
       <Link href="/">
         <Button data-testid="button-return-dashboard" variant="outline" className="mt-4 border-primary/30 text-primary hover:bg-primary/10">
-          Return to Command Center
+          Return to Dashboard
         </Button>
       </Link>
     </div>
