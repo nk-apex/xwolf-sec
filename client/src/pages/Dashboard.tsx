@@ -14,8 +14,8 @@ export default function Dashboard() {
   const secureCount = totalScans - vulnerableCount;
 
   return (
-    <div className="space-y-10">
-      <section className="text-center space-y-6 pt-8 pb-4 relative">
+    <div className="space-y-4 sm:space-y-8" data-testid="overview-page">
+      <section className="mb-6 sm:mb-8">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -23,11 +23,11 @@ export default function Dashboard() {
         >
           <h1
             data-testid="text-hero-title"
-            className="text-3xl md:text-5xl font-bold tracking-tight mb-3 neon-text"
+            className="text-xl sm:text-3xl font-bold mb-1 sm:mb-2 neon-text"
           >
             Command Center
           </h1>
-          <p className="text-sm text-muted-foreground max-w-xl mx-auto mb-8 font-mono">
+          <p className="text-gray-400 font-mono text-xs sm:text-sm mb-6">
             Deep security analysis for DDoS resilience, scraping vulnerabilities,
             and server configuration.
           </p>
@@ -36,40 +36,56 @@ export default function Dashboard() {
         <ScannerInput />
       </section>
 
-      <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4" data-testid="section-stats">
-        <StatsCard
-          icon={Activity}
-          label="TOTAL SCANS"
-          value={totalScans.toString()}
-        />
-        <StatsCard
-          icon={ShieldCheck}
-          label="SECURE TARGETS"
-          value={secureCount.toString()}
-        />
-        <StatsCard
-          icon={AlertTriangle}
-          label="VULNERABILITIES"
-          value={vulnerableCount.toString()}
-          isAlert={vulnerableCount > 0}
-        />
-        <StatsCard
-          icon={Server}
-          label="ACTIVE MONITORS"
-          value="24/7"
-        />
+      <section className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4 mb-4 sm:mb-8" data-testid="section-stats">
+        {[
+          { icon: Activity, label: "Total Scans", value: totalScans.toString(), color: "primary" },
+          { icon: ShieldCheck, label: "Secure Targets", value: secureCount.toString(), color: "primary" },
+          { icon: AlertTriangle, label: "Vulnerabilities", value: vulnerableCount.toString(), color: vulnerableCount > 0 ? "destructive" : "primary" },
+          { icon: Server, label: "Active Monitors", value: "24/7", color: "primary" },
+        ].map((stat, index) => (
+          <motion.div
+            key={stat.label}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: index * 0.1 }}
+          >
+            <div className={cn(
+              "p-3 sm:p-5 rounded-xl border bg-black/30 backdrop-blur-sm h-full",
+              stat.color === "destructive" ? "border-destructive/20" : "border-primary/20"
+            )}>
+              <div className="flex justify-between items-start gap-1">
+                <div className="min-w-0 flex-1">
+                  <p className="text-gray-400 text-[9px] sm:text-xs uppercase tracking-wider mb-0.5 sm:mb-1 truncate">{stat.label}</p>
+                  <h3 className={cn(
+                    "text-sm sm:text-2xl font-bold font-mono truncate",
+                    stat.color === "destructive" ? "text-destructive" : "neon-text"
+                  )} data-testid={`text-stat-value-${stat.label.toLowerCase().replace(/\s+/g, '-')}`}>
+                    {stat.value}
+                  </h3>
+                </div>
+                <div className={cn(
+                  "p-1 sm:p-2 rounded-lg shrink-0",
+                  stat.color === "destructive" ? "bg-destructive/10" : "bg-primary/10"
+                )}>
+                  <stat.icon className={cn(
+                    "w-3.5 h-3.5 sm:w-5 sm:h-5",
+                    stat.color === "destructive" ? "text-destructive" : "text-primary"
+                  )} />
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        ))}
       </section>
 
-      <section className="space-y-6">
-        <div className="flex items-center gap-3">
-          <Zap className="w-5 h-5 text-primary drop-shadow-[0_0_4px_rgba(0,255,0,0.5)]" />
-          <h2 className="text-xl font-bold neon-text tracking-wide">
-            Recent Scans
-          </h2>
-        </div>
+      <section className="space-y-4 sm:space-y-6">
+        <h2 className="text-base sm:text-xl font-bold flex items-center">
+          <Zap className="w-4 h-4 sm:w-5 sm:h-5 mr-2 text-primary drop-shadow-[0_0_4px_rgba(0,255,0,0.5)]" />
+          <span className="neon-text">Recent Scans</span>
+        </h2>
 
         {isLoading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
             {[1, 2, 3].map((i) => (
               <div
                 key={i}
@@ -93,13 +109,13 @@ export default function Dashboard() {
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {scans?.slice(0, 6).map((scan) => (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+            {scans?.slice(0, 6).map((scan, index) => (
               <motion.div
                 key={scan.id}
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
-                transition={{ duration: 0.3 }}
+                transition={{ delay: index * 0.05, duration: 0.3 }}
               >
                 <ScanCard scan={scan} />
               </motion.div>
@@ -107,33 +123,6 @@ export default function Dashboard() {
           </div>
         )}
       </section>
-    </div>
-  );
-}
-
-function StatsCard({ icon: Icon, label, value, isAlert }: { icon: any; label: string; value: string; isAlert?: boolean }) {
-  return (
-    <div
-      className={cn(
-        "cyber-card p-5 flex items-center gap-4",
-        isAlert && "border-destructive/30"
-      )}
-    >
-      <div className={cn(
-        "p-2.5 rounded-lg border",
-        isAlert
-          ? "bg-destructive/10 border-destructive/20"
-          : "bg-primary/5 border-primary/15"
-      )}>
-        <Icon className={cn("w-5 h-5", isAlert ? "text-destructive" : "text-primary drop-shadow-[0_0_4px_rgba(0,255,0,0.3)]")} />
-      </div>
-      <div>
-        <p className="text-[10px] text-muted-foreground font-mono tracking-widest uppercase">{label}</p>
-        <p className={cn(
-          "text-2xl font-bold font-mono",
-          isAlert ? "text-destructive" : "neon-text"
-        )}>{value}</p>
-      </div>
     </div>
   );
 }

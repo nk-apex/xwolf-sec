@@ -38,7 +38,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
             <img src={faviconPath} alt="XWOLF SEC" className="w-9 h-9 rounded-lg border border-primary/20" />
             <div>
               <h1 className="font-bold text-base tracking-wider neon-text" data-testid="text-brand">XWOLF SEC</h1>
-              <p className="text-[10px] text-muted-foreground font-mono tracking-widest">THREAT INTEL v2.0</p>
+              <p className="text-[9px] text-muted-foreground font-mono tracking-wider leading-tight">Security Analysis<br />& Threat Intelligence</p>
             </div>
           </div>
 

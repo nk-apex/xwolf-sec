@@ -18,23 +18,22 @@ export function ScanCard({ scan }: ScanCardProps) {
       <Card
         data-testid={`card-scan-${scan.id}`}
         className={cn(
-          "cyber-card p-5 cursor-pointer h-full flex flex-col justify-between overflow-hidden relative",
+          "cyber-card p-5 cursor-pointer h-full flex flex-col justify-between relative",
           isRisky ? "hover:border-destructive/40" : "hover:border-primary/40"
         )}
       >
-        <div className="absolute inset-0 bg-gradient-to-r from-primary/0 via-primary/3 to-primary/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000" />
-
         <div>
-          <div className="flex justify-between items-start mb-4">
-            <div className="flex items-center gap-2 min-w-0">
+          <div className="flex items-start gap-3 mb-4">
+            <div className="flex items-center gap-2 min-w-0 flex-1">
               <Globe className="w-4 h-4 text-primary/50 shrink-0" />
-              <h3 className="font-mono font-medium text-sm truncate max-w-[180px] text-card-foreground group-hover:text-primary transition-colors">
+              <h3 className="font-mono font-medium text-sm truncate text-card-foreground group-hover:text-primary transition-colors">
                 {scan.url.replace(/^https?:\/\//, "")}
               </h3>
             </div>
             <StatusBadge
               status={isRisky ? "vulnerable" : "secure"}
-              label={isRisky ? "Risks" : "Secure"}
+              label={isRisky ? "Risks Detected" : "Secure"}
+              className="shrink-0 whitespace-nowrap"
             />
           </div>
 
