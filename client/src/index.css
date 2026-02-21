@@ -286,3 +286,7 @@
     inset: -1px;
   }
 }
+
+.cyber-card {
+  @apply bg-card border border-border/50 rounded-xl transition-all duration-300;
+}
