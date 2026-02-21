@@ -3,7 +3,7 @@ import { Shield, LayoutDashboard, History, Settings, Menu, X, Zap } from "lucide
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import logoPath from "@assets/image_1771640058636.png";
+import logoPath from "@assets/xwolf_logo.png";
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
