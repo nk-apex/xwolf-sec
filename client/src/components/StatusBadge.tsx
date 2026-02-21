@@ -10,10 +10,10 @@ interface StatusBadgeProps {
 
 export function StatusBadge({ status, label, className, showIcon = true }: StatusBadgeProps) {
   const variants = {
-    secure: "bg-primary/10 text-primary border-primary/20 hover:bg-primary/20",
-    vulnerable: "bg-destructive/10 text-destructive border-destructive/20 hover:bg-destructive/20",
-    warning: "bg-yellow-500/10 text-yellow-500 border-yellow-500/20 hover:bg-yellow-500/20",
-    info: "bg-blue-500/10 text-blue-500 border-blue-500/20 hover:bg-blue-500/20",
+    secure: "bg-primary/10 text-primary border-primary/30",
+    vulnerable: "bg-destructive/10 text-destructive border-destructive/30",
+    warning: "bg-yellow-500/10 text-yellow-500 border-yellow-500/30",
+    info: "bg-blue-500/10 text-blue-500 border-blue-500/30",
   };
 
   const icons = {
@@ -29,12 +29,12 @@ export function StatusBadge({ status, label, className, showIcon = true }: Statu
     <div
       data-testid={`badge-status-${status}`}
       className={cn(
-        "inline-flex items-center px-3 py-1 rounded-full text-xs font-medium border transition-colors",
+        "inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold font-mono border transition-colors tracking-wider uppercase",
         variants[status],
         className
       )}
     >
-      {showIcon && <Icon className="w-3.5 h-3.5 mr-1.5" />}
+      {showIcon && <Icon className="w-3 h-3 mr-1.5" />}
       {label}
     </div>
   );
