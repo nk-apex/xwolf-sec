@@ -1,8 +1,9 @@
 import { Link, useLocation } from "wouter";
-import { LayoutDashboard, History, Settings, Menu, X, Zap, PanelLeftClose, PanelLeft } from "lucide-react";
+import { LayoutDashboard, History, Settings, Menu, X, Zap, PanelLeftClose, PanelLeft, Phone, Users, MessageCircle } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { SiWhatsapp } from "react-icons/si";
 import logoPath from "@assets/xwolf_logo.png";
 import { MatrixBackground } from "./MatrixBackground";
 
@@ -15,6 +16,12 @@ export function Layout({ children }: { children: React.ReactNode }) {
     { href: "/", label: "Dashboard", icon: LayoutDashboard },
     { href: "/history", label: "Scan History", icon: History },
     { href: "/settings", label: "Settings", icon: Settings },
+  ];
+
+  const whatsappNumbers = [
+    { number: "254703397679", display: "+254 703 397679" },
+    { number: "254713046497", display: "+254 713 046497" },
+    { number: "254733961184", display: "+254 733 961184" },
   ];
 
   return (
@@ -47,7 +54,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
           sidebarCollapsed ? "md:w-[68px]" : "md:w-60"
         )}
       >
-        <div className="h-full flex flex-col">
+        <div className="h-full flex flex-col overflow-y-auto">
           <div className={cn("p-4 border-b border-primary/20", mobileMenuOpen && "mt-[60px] md:mt-0")}>
             <div className={cn("flex items-center gap-3 mb-1", sidebarCollapsed && "md:justify-center")}>
               <img src={logoPath} alt="XWOLF SEC" className={cn("rounded shrink-0", sidebarCollapsed ? "md:h-7" : "h-9")} />
@@ -85,13 +92,68 @@ export function Layout({ children }: { children: React.ReactNode }) {
             })}
           </nav>
 
-          <div className={cn("p-3 border-t border-primary/20", sidebarCollapsed && "md:px-2")}>
+          <div className={cn("p-3 border-t border-primary/20 space-y-3", sidebarCollapsed && "md:px-2")}>
+            <div className={cn("rounded-xl p-3 text-[10px] font-mono border border-primary/20 bg-black/30", sidebarCollapsed && "md:hidden")}>
+              <div className="flex items-center gap-1.5 mb-2 text-primary/80">
+                <SiWhatsapp className="w-3.5 h-3.5 shrink-0" />
+                <span className="font-bold tracking-wider text-[9px]">CONTACT</span>
+              </div>
+              <div className="space-y-1.5">
+                {whatsappNumbers.map((w) => (
+                  <a
+                    key={w.number}
+                    href={`https://wa.me/${w.number}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    data-testid={`link-whatsapp-${w.number}`}
+                    className="flex items-center gap-1.5 text-muted-foreground hover:text-primary transition-colors"
+                  >
+                    <Phone className="w-2.5 h-2.5 shrink-0" />
+                    <span className="text-[9px]">{w.display}</span>
+                  </a>
+                ))}
+              </div>
+              <div className="mt-2 pt-2 border-t border-primary/10 space-y-1.5">
+                <a
+                  href="https://chat.whatsapp.com/HjFc3pud3IA0R0WGr1V2Xu"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  data-testid="link-whatsapp-group"
+                  className="flex items-center gap-1.5 text-muted-foreground hover:text-primary transition-colors"
+                >
+                  <Users className="w-2.5 h-2.5 shrink-0" />
+                  <span className="text-[9px]">Join WhatsApp Group</span>
+                </a>
+                <a
+                  href="https://whatsapp.com/channel/0029Vb6dn9nEQIaqEMNclK3Y"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  data-testid="link-whatsapp-channel"
+                  className="flex items-center gap-1.5 text-muted-foreground hover:text-primary transition-colors"
+                >
+                  <MessageCircle className="w-2.5 h-2.5 shrink-0" />
+                  <span className="text-[9px]">Follow Channel</span>
+                </a>
+              </div>
+            </div>
+
+            {sidebarCollapsed && (
+              <div className="hidden md:flex flex-col items-center gap-2">
+                <a href="https://wa.me/254703397679" target="_blank" rel="noopener noreferrer" title="WhatsApp" data-testid="link-whatsapp-collapsed">
+                  <SiWhatsapp className="w-4 h-4 text-muted-foreground hover:text-primary transition-colors" />
+                </a>
+                <a href="https://chat.whatsapp.com/HjFc3pud3IA0R0WGr1V2Xu" target="_blank" rel="noopener noreferrer" title="WhatsApp Group" data-testid="link-whatsapp-group-collapsed">
+                  <Users className="w-4 h-4 text-muted-foreground hover:text-primary transition-colors" />
+                </a>
+              </div>
+            )}
+
             <Button
               data-testid="button-toggle-sidebar"
               variant="ghost"
               size="sm"
               onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-              className="hidden md:flex w-full items-center justify-center gap-2 text-xs font-mono text-muted-foreground mb-2"
+              className="hidden md:flex w-full items-center justify-center gap-2 text-xs font-mono text-muted-foreground"
               title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
             >
               {sidebarCollapsed ? (
@@ -120,8 +182,87 @@ export function Layout({ children }: { children: React.ReactNode }) {
         </div>
       </aside>
 
-      <main className="flex-1 overflow-auto relative z-10">
-        <div className="relative container mx-auto p-4 md:p-8 max-w-7xl">{children}</div>
+      <main className="flex-1 overflow-auto relative z-10 flex flex-col min-h-screen md:min-h-0">
+        <div className="relative container mx-auto p-4 md:p-8 max-w-7xl flex-1">{children}</div>
+
+        <footer className="relative z-10 border-t border-primary/20 bg-black/80 backdrop-blur-sm" data-testid="footer">
+          <div className="container mx-auto px-4 md:px-8 py-6 max-w-7xl">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div>
+                <div className="flex items-center gap-2 mb-3">
+                  <img src={logoPath} alt="XWOLF SEC" className="h-6 rounded" />
+                  <span className="font-bold text-sm tracking-wider text-white">XWOLF SEC</span>
+                </div>
+                <p className="text-[11px] text-muted-foreground font-mono leading-relaxed">
+                  Security Analysis & Threat Intelligence Platform
+                </p>
+                <p className="text-[11px] text-primary/70 font-mono mt-2 tracking-wider">
+                  Project by <span className="text-primary font-bold neon-text">Silent Wolf</span>
+                </p>
+              </div>
+
+              <div>
+                <h3 className="text-[10px] font-mono font-bold text-primary/80 tracking-widest mb-3 flex items-center gap-1.5">
+                  <SiWhatsapp className="w-3.5 h-3.5" />
+                  WHATSAPP
+                </h3>
+                <div className="space-y-2">
+                  {whatsappNumbers.map((w) => (
+                    <a
+                      key={w.number}
+                      href={`https://wa.me/${w.number}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      data-testid={`footer-whatsapp-${w.number}`}
+                      className="flex items-center gap-2 text-[11px] font-mono text-muted-foreground hover:text-primary transition-colors"
+                    >
+                      <Phone className="w-3 h-3 shrink-0" />
+                      {w.display}
+                    </a>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <h3 className="text-[10px] font-mono font-bold text-primary/80 tracking-widest mb-3 flex items-center gap-1.5">
+                  <Users className="w-3.5 h-3.5" />
+                  COMMUNITY
+                </h3>
+                <div className="space-y-2">
+                  <a
+                    href="https://chat.whatsapp.com/HjFc3pud3IA0R0WGr1V2Xu"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    data-testid="footer-whatsapp-group"
+                    className="flex items-center gap-2 text-[11px] font-mono text-muted-foreground hover:text-primary transition-colors"
+                  >
+                    <Users className="w-3 h-3 shrink-0" />
+                    Join WhatsApp Group
+                  </a>
+                  <a
+                    href="https://whatsapp.com/channel/0029Vb6dn9nEQIaqEMNclK3Y"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    data-testid="footer-whatsapp-channel"
+                    className="flex items-center gap-2 text-[11px] font-mono text-muted-foreground hover:text-primary transition-colors"
+                  >
+                    <MessageCircle className="w-3 h-3 shrink-0" />
+                    Follow WhatsApp Channel
+                  </a>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-6 pt-4 border-t border-primary/10 flex flex-col sm:flex-row items-center justify-between gap-2">
+              <p className="text-[10px] font-mono text-muted-foreground/60 tracking-wider">
+                &copy; {new Date().getFullYear()} XWOLF SEC &mdash; All rights reserved
+              </p>
+              <p className="text-[10px] font-mono text-primary/40 tracking-widest">
+                SILENT WOLF SECURITY
+              </p>
+            </div>
+          </div>
+        </footer>
       </main>
     </div>
   );

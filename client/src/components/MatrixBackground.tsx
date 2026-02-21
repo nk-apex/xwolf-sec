@@ -31,15 +31,15 @@ export function MatrixBackground() {
     function draw() {
       if (!ctx || !canvas) return;
 
-      ctx.fillStyle = "rgba(5, 5, 5, 0.08)";
+      ctx.fillStyle = "rgba(5, 5, 5, 0.06)";
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
       for (let i = 0; i < columns.length; i++) {
         const x = i * fontSize;
         const y = columns[i] * fontSize;
 
-        const isWordColumn = i % 12 === 0;
-        const wordIndex = Math.floor(i / 12) % words.length;
+        const isWordColumn = i % 10 === 0;
+        const wordIndex = Math.floor(i / 10) % words.length;
         const word = words[wordIndex];
         const charIndex = Math.floor(columns[i]) % word.length;
 
@@ -51,20 +51,26 @@ export function MatrixBackground() {
         }
 
         const brightness = Math.random();
+        const isHead = y > 0 && y < canvas.height && columns[i] - Math.floor(columns[i]) < 0.05;
 
-        if (brightness > 0.97) {
-          ctx.fillStyle = "rgba(0, 255, 0, 0.9)";
-          ctx.shadowColor = "rgba(0, 255, 0, 0.8)";
-          ctx.shadowBlur = 15;
-        } else if (brightness > 0.9) {
-          ctx.fillStyle = "rgba(0, 255, 0, 0.6)";
-          ctx.shadowColor = "rgba(0, 255, 0, 0.4)";
-          ctx.shadowBlur = 8;
-        } else if (brightness > 0.7) {
+        if (isHead || brightness > 0.95) {
+          ctx.fillStyle = "rgba(150, 255, 150, 1)";
+          ctx.shadowColor = "rgba(0, 255, 0, 1)";
+          ctx.shadowBlur = 25;
+        } else if (brightness > 0.88) {
+          ctx.fillStyle = "rgba(0, 255, 0, 0.85)";
+          ctx.shadowColor = "rgba(0, 255, 0, 0.7)";
+          ctx.shadowBlur = 18;
+        } else if (brightness > 0.75) {
+          ctx.fillStyle = "rgba(0, 230, 0, 0.5)";
+          ctx.shadowColor = "rgba(0, 255, 0, 0.3)";
+          ctx.shadowBlur = 10;
+        } else if (brightness > 0.5) {
           ctx.fillStyle = "rgba(0, 200, 0, 0.3)";
-          ctx.shadowBlur = 0;
+          ctx.shadowColor = "rgba(0, 200, 0, 0.15)";
+          ctx.shadowBlur = 5;
         } else {
-          ctx.fillStyle = "rgba(0, 150, 0, 0.12)";
+          ctx.fillStyle = "rgba(0, 150, 0, 0.15)";
           ctx.shadowBlur = 0;
         }
 
@@ -94,7 +100,7 @@ export function MatrixBackground() {
     <canvas
       ref={canvasRef}
       className="fixed inset-0 z-0 pointer-events-none"
-      style={{ opacity: 0.45 }}
+      style={{ opacity: 0.55 }}
     />
   );
 }
