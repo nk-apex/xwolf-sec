@@ -11,14 +11,23 @@ function finding(severity: SeverityLevel, category: string, title: string, detai
 }
 
 async function analyzeUrl(targetUrl: string) {
-  const urlObj = new URL(targetUrl);
+  let urlObj: URL;
+  try {
+    urlObj = new URL(targetUrl);
+  } catch {
+    throw new Error("Invalid URL format. Please enter a valid URL like https://example.com");
+  }
+
+  if (!["http:", "https:"].includes(urlObj.protocol)) {
+    throw new Error("Only HTTP and HTTPS URLs are supported.");
+  }
 
   let targetIp: string | null = null;
   try {
     const lookup = await dns.lookup(urlObj.hostname);
     targetIp = lookup.address;
   } catch (e) {
-    console.error("DNS lookup failed", e);
+    throw new Error(`The website "${urlObj.hostname}" does not exist or cannot be resolved. DNS lookup failed — please check the URL and try again.`);
   }
 
   const findings: Finding[] = [];
@@ -595,6 +604,13 @@ export async function registerRoutes(
           message: err.errors[0].message,
           field: err.errors[0].path.join("."),
         });
+      }
+      if (err instanceof Error && (
+        err.message.includes("does not exist") ||
+        err.message.includes("Invalid URL") ||
+        err.message.includes("Only HTTP")
+      )) {
+        return res.status(400).json({ message: err.message });
       }
       console.error("Scan error:", err);
       res.status(500).json({ message: "Failed to perform scan" });
