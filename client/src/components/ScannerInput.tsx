@@ -25,37 +25,39 @@ export function ScannerInput() {
   return (
     <form onSubmit={handleScan} data-testid="form-scanner" className="relative w-full max-w-2xl mx-auto">
       <div className="relative group">
-        <div className="absolute -inset-1 bg-gradient-to-r from-primary/30 via-primary/10 to-primary/30 rounded-lg blur opacity-40 group-hover:opacity-80 transition duration-500"></div>
-        <div className="relative flex shadow-xl">
-          <div className="absolute left-4 top-1/2 -translate-y-1/2 text-primary/50">
-            <Terminal className="w-4 h-4" />
-          </div>
-          <Input
-            data-testid="input-url"
-            value={url}
-            onChange={(e) => setUrl(e.target.value)}
-            placeholder="Enter target URL (e.g. https://example.com)"
-            className="h-14 pl-10 pr-32 rounded-lg font-mono text-sm text-primary border-primary/20 bg-black/30 backdrop-blur-sm focus-visible:ring-1 focus-visible:ring-primary/50 placeholder:text-muted-foreground/50"
-          />
-          <div className="absolute right-2 top-2 bottom-2">
-            <Button
-              data-testid="button-analyze"
-              type="submit"
-              disabled={createScan.isPending}
-              className="h-full px-6 font-bold font-mono text-xs tracking-wider bg-primary text-primary-foreground shadow-[0_0_15px_rgba(0,255,0,0.3)] transition-all duration-300 uppercase"
-            >
-              {createScan.isPending ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Scanning
-                </>
-              ) : (
-                <>
-                  <Search className="mr-2 h-4 w-4" />
-                  Analyze
-                </>
-              )}
-            </Button>
+        <div className="absolute -inset-0.5 rounded-xl bg-primary/20 blur-sm opacity-0 group-hover:opacity-100 transition duration-500"></div>
+        <div className="relative rounded-xl border border-primary/20 bg-black/30 backdrop-blur-sm overflow-hidden hover:border-primary/30 transition-colors">
+          <div className="flex items-center">
+            <div className="pl-4 text-primary/50">
+              <Terminal className="w-4 h-4" />
+            </div>
+            <Input
+              data-testid="input-url"
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              placeholder="Enter target URL (e.g. https://example.com)"
+              className="h-14 pl-3 pr-32 border-0 bg-transparent font-mono text-sm text-primary focus-visible:ring-0 focus-visible:ring-offset-0 placeholder:text-muted-foreground/50"
+            />
+            <div className="pr-2">
+              <Button
+                data-testid="button-analyze"
+                type="submit"
+                disabled={createScan.isPending}
+                className="h-10 px-6 font-bold font-mono text-xs tracking-wider bg-primary text-primary-foreground shadow-[0_0_15px_rgba(0,255,0,0.3)] hover:shadow-[0_0_25px_rgba(0,255,0,0.4)] transition-all duration-300 uppercase rounded-lg"
+              >
+                {createScan.isPending ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Scanning
+                  </>
+                ) : (
+                  <>
+                    <Search className="mr-2 h-4 w-4" />
+                    Analyze
+                  </>
+                )}
+              </Button>
+            </div>
           </div>
         </div>
       </div>
